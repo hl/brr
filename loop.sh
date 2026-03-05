@@ -48,7 +48,7 @@ while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
         break
     fi
     EFFORT_FLAG=()
-    [ -n "$EFFORT" ] && EFFORT_FLAG=(--reasoning-effort "$EFFORT")
+    [ -n "$EFFORT" ] && EFFORT_FLAG=(--effort "$EFFORT")
     if [ -f "$PROMPT" ]; then
         claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" "${EFFORT_FLAG[@]}" < "$PROMPT" || true
     else
