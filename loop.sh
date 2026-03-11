@@ -50,9 +50,9 @@ while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
     EFFORT_FLAG=()
     [ -n "$EFFORT" ] && EFFORT_FLAG=(--effort "$EFFORT")
     if [ -f "$PROMPT" ]; then
-        claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" "${EFFORT_FLAG[@]}" < "$PROMPT" || true
+        claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} < "$PROMPT" || true
     else
-        echo "$PROMPT" | claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" "${EFFORT_FLAG[@]}" || true
+        printf '%s' "$PROMPT" | claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} || true
     fi
     I=$((I + 1))
 done
