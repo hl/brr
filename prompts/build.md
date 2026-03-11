@@ -48,7 +48,7 @@ Spawn a Task agent (subagent_type: general-purpose, model: opus) with:
 - Which files were created or modified (list them explicitly)
 - Instruction: run all validation commands. If validation fails, diagnose and fix, then re-run. If still failing after a reasonable attempt, return the failure details.
 
-If validation could not be fixed, document the blocker in IMPLEMENTATION_PLAN.md, commit only the blocker update, and exit. Do NOT commit the broken implementation — discard it with `git checkout -- .` before committing the blocker. The next iteration will get a fresh attempt.
+If validation could not be fixed, discard the broken implementation with `git stash --include-untracked -m "failed: <task description>"`, then document the blocker in IMPLEMENTATION_PLAN.md, commit only the blocker update, and exit. The stash preserves the failed attempt for debugging. The next iteration will get a fresh attempt.
 
 ## Phase 5: Review (only if validation passed)
 
