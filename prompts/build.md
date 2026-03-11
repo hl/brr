@@ -15,7 +15,7 @@ Wait for the agent to return before proceeding.
 
 ## Phase 2: Select
 
-If all tasks in IMPLEMENTATION_PLAN.md are complete, create a file named `.loop-complete` on disk (do NOT stage or commit this file — it is a signal to the loop script, not part of the repo), then commit any final plan updates and exit. Do not continue.
+If all tasks in IMPLEMENTATION_PLAN.md are complete, commit any final plan updates first, then create a file named `.loop-complete` on disk (do NOT stage or commit this file — it is a signal to the loop script, not part of the repo) and exit. Do not continue.
 
 Pick the highest-priority incomplete task. If the task is tagged `[APPROVAL]`, create a file named `.loop-needs-approval` containing the task description, then exit. Do not implement it.
 
@@ -50,19 +50,24 @@ Spawn a Task agent (subagent_type: general-purpose, model: opus) with:
 
 If validation could not be fixed, discard the broken implementation with `git stash --include-untracked -m "failed: <task description>"`, then document the blocker in IMPLEMENTATION_PLAN.md, commit only the blocker update, and exit. The stash preserves the failed attempt for debugging. The next iteration will get a fresh attempt.
 
-## Phase 5: Review (only if validation passed)
+## Phase 5: Simplify (only if validation passed)
+
+Run `/simplify` on the current changes.
+
+## Phase 6: Review (only if validation passed)
 
 Run `/pr-review-toolkit:review-pr` on the current changes (working diff, no PR required).
 
-Only block for: failing tests, uncaught exceptions, security vulnerabilities (injection, auth bypass), data loss scenarios, or logic that contradicts the spec. Everything else is a suggestion — proceed to Phase 6.
+Only block for: failing tests, uncaught exceptions, security vulnerabilities (injection, auth bypass), data loss scenarios, or logic that contradicts the spec. Everything else is a suggestion — proceed to Phase 7.
 
-If the review finds blocking issues, fix them and re-run validation (Phase 4). Do NOT re-review after fixing — proceed directly to Phase 6. If a blocking issue cannot be fixed in a reasonable attempt, proceed to Phase 6 anyway and add the issue to IMPLEMENTATION_PLAN.md as a follow-up task.
+If the review finds blocking issues, fix them and re-run validation (Phase 4). Do NOT re-review after fixing — proceed directly to Phase 7. If a blocking issue cannot be fixed in a reasonable attempt, discard the implementation (same as Phase 4 failure: stash, document blocker, commit blocker update, exit). Do NOT commit code with known blocking issues.
 
-## Phase 6: Finalize (only if validation passed)
+## Phase 7: Finalize (only if validation passed)
 
 1. Remove the completed task from IMPLEMENTATION_PLAN.md. Add any learnings relevant to remaining tasks.
-2. `git add` relevant files (not logs or build artifacts).
-3. `git commit` with format `type(scope): description` (e.g., `feat(kanban): add board LiveView with drag-and-drop`).
+2. `git reset HEAD` to clear any pre-existing staged files.
+3. `git add` relevant files (not logs or build artifacts). Stage files explicitly by path.
+4. `git commit` using the commit format from AGENTS.md.
 
 ## Rules (priority order)
 
