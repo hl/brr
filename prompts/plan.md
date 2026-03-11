@@ -9,7 +9,7 @@ Create or update IMPLEMENTATION_PLAN.md as a prioritized bullet list:
 - Size: each task should be completable in one build iteration
 - TDD: each task must list the test file(s) to write first, then the implementation files — the build phase writes failing tests before production code
 - Format: note which files/modules each task touches (the build phase uses this to assess parallelism)
-- Approval: tag tasks with `[APPROVAL]` when they require human approval per the Decision Authority section in AGENTS.md
+- Approval: tasks that require human approval per the Decision Authority section in AGENTS.md must use the `[APPROVAL]` checkbox marker (e.g. `- [APPROVAL] **1.2 — Task name**`). Do NOT write "requiring approval" or similar prose in the task description — the marker is the only signal the build loop checks for
 - Hygiene: remove tasks only when the implementation verifiably satisfies the spec
 
 Stage and commit: `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): update implementation plan"`. If there are no changes to commit, skip this step.

@@ -17,7 +17,7 @@ Wait for the agent to return before proceeding.
 
 If all tasks in IMPLEMENTATION_PLAN.md are complete, commit any final plan updates first, then create a file named `.loop-complete` on disk (do NOT stage or commit this file — it is a signal to the loop script, not part of the repo) and exit. Do not continue.
 
-Pick the highest-priority incomplete task. If the task is tagged `[APPROVAL]`, create a file named `.loop-needs-approval` containing the task description, then exit. Do not implement it.
+Pick the highest-priority incomplete task. If the task uses the `[APPROVAL]` checkbox marker (literally `- [APPROVAL] **...`), create a file named `.loop-needs-approval` containing the task description, then exit. Do not implement it. Note: only the literal `[APPROVAL]` marker triggers this — prose mentioning "approval" or "requiring approval" in a task description does NOT count.
 
 Spawn a Task agent (subagent_type: Explore, model: sonnet) to search `lib/*`, `test/*`, `config/*`, `assets/*`, and `priv/*` for existing code related to this task — don't assume not implemented.
 
