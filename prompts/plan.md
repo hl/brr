@@ -7,8 +7,9 @@ Identify gaps: missing functionality, partial implementations, requirements not 
 Create or update IMPLEMENTATION_PLAN.md as a prioritized bullet list:
 - Priority: blockers/dependencies first, then core functionality, then refinements
 - Size: each task should be completable in one build iteration
+- TDD: each task must list the test file(s) to write first, then the implementation files — the build phase writes failing tests before production code
 - Format: note which files/modules each task touches (the build phase uses this to assess parallelism)
-- Approval: tag tasks that require human approval per AGENTS.md Decision Authority (new migrations, new routes, architectural changes, new runtime deps) with `[APPROVAL]`
+- Approval: tag tasks with `[APPROVAL]` when they require human approval per the Decision Authority section in AGENTS.md
 - Hygiene: remove tasks only when the implementation verifiably satisfies the spec
 
 Stage and commit: `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): update implementation plan"`. If there are no changes to commit, skip this step.
