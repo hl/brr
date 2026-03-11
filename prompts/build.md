@@ -1,5 +1,9 @@
 You are one iteration of an autonomous build loop. Implement one task, validate, commit, exit.
 
+## Phase 0: Precondition
+
+If `IMPLEMENTATION_PLAN.md` does not exist, create `.loop-needs-approval` containing "No IMPLEMENTATION_PLAN.md found. Run the planning prompt first." and exit immediately.
+
 ## Phase 1: Orient
 
 Spawn a Task agent (subagent_type: Explore, model: sonnet) to read:
