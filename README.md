@@ -7,7 +7,7 @@ Based on [The Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook).
 ## Usage
 
 ```bash
-./loop.sh <prompt> [--max N] [--model NAME] [--turns N]
+./loop.sh <prompt> [--max N] [--model NAME] [--turns N] [--effort LEVEL]
 ```
 
 The prompt is a file path or an inline string. Flags can go in any order.
@@ -17,6 +17,7 @@ The prompt is a file path or an inline string. Flags can go in any order.
 | `--max` | `0` (unlimited) | Max loop iterations |
 | `--model` | `sonnet` | Claude model |
 | `--turns` | `200` | Tool-use rounds per iteration |
+| `--effort` | _(none)_ | Reasoning effort: `low`, `medium`, or `high` |
 
 ## Examples
 
@@ -42,9 +43,15 @@ The prompt is a file path or an inline string. Flags can go in any order.
 
 ## How It Works
 
-The script loops, piping the same prompt to `claude -p --dangerously-skip-permissions` each iteration. On failure, it continues to the next iteration.
+The script loops, piping the same prompt to `claude -p --dangerously-skip-permissions` each iteration. If an iteration fails, the loop continues — but 3 consecutive failures stop the loop to avoid burning iterations on a persistent error.
 
 Each iteration gets a fresh context window — no degradation over long sessions. All behavior (what to implement, when to commit, when to stop) lives in the prompt, not the script.
+
+Prompts can signal the loop to stop by creating files:
+- `.loop-complete` — all tasks done, stop the loop
+- `.loop-needs-approval` — a task needs human review, stop and print the contents
+
+These signal files are cleaned up automatically on exit.
 
 ## Safety
 
