@@ -18,8 +18,9 @@
 #   ./loop.sh prompts/build.md --max 20 --model opus
 #   ./loop.sh "Fix all TODO comments in src/" --max 5
 set -euo pipefail
+trap 'rm -f .loop-complete .loop-needs-approval' EXIT
 
-PROMPT="" MAX=0 MODEL=sonnet MAX_TURNS=200 EFFORT=""
+PROMPT="" MAX=0 MODEL=sonnet MAX_TURNS=200 EFFORT="" FAIL_STREAK=0 MAX_FAIL_STREAK=3
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -49,10 +50,21 @@ while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
     fi
     EFFORT_FLAG=()
     [ -n "$EFFORT" ] && EFFORT_FLAG=(--effort "$EFFORT")
+    RC=0
     if [ -f "$PROMPT" ]; then
-        claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} < "$PROMPT" || true
+        claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} < "$PROMPT" || RC=$?
     else
-        printf '%s' "$PROMPT" | claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} || true
+        printf '%s' "$PROMPT" | claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} || RC=$?
+    fi
+    if [ "$RC" -ne 0 ]; then
+        FAIL_STREAK=$((FAIL_STREAK + 1))
+        echo "Iteration $((I + 1)) failed (exit $RC). Consecutive failures: $FAIL_STREAK/$MAX_FAIL_STREAK"
+        if [ "$FAIL_STREAK" -ge "$MAX_FAIL_STREAK" ]; then
+            echo "Too many consecutive failures. Stopping."
+            exit 1
+        fi
+    else
+        FAIL_STREAK=0
     fi
     I=$((I + 1))
 done
