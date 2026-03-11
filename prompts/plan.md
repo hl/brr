@@ -1,6 +1,6 @@
-Spawn a Task agent (subagent_type: Explore, model: sonnet) to study `docs/specs/*`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md` (if present), and source code (`lib/*`, `test/*`). Don't assume functionality is missing — confirm with code search first.
+Spawn a Task agent (subagent_type: Explore, model: sonnet) to study `docs/specs/*`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md` (if present), and source code (`lib/*`, `test/*`, `config/*`, `assets/*`, `priv/*`). Don't assume functionality is missing — confirm with code search first.
 
-Compare current source code (`lib/*`, `test/*`) against every spec in `docs/specs/*`. Treat each spec as the source of truth for what the code should do. For every spec — including those marked "Complete" in IMPLEMENTATION_PLAN.md — verify that the current implementation satisfies every requirement and acceptance criterion. Do not trust prior status; re-gap from scratch.
+Compare current source code (`lib/*`, `test/*`, `config/*`, `assets/*`, `priv/*`) against every spec in `docs/specs/*`. Treat each spec as the source of truth for what the code should do. For every spec — including those marked "Complete" in IMPLEMENTATION_PLAN.md — verify that the current implementation satisfies every requirement and acceptance criterion. Do not trust prior status; re-gap from scratch.
 
 Identify gaps: missing functionality, partial implementations, requirements not covered by tests, TODOs, placeholders, skipped/flaky tests, and inconsistent patterns.
 

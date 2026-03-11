@@ -15,7 +15,7 @@ If all tasks in IMPLEMENTATION_PLAN.md are complete, create a file named `.loop-
 
 Pick the highest-priority incomplete task. If the task is tagged `[APPROVAL]`, create a file named `.loop-needs-approval` containing the task description, then exit. Do not implement it.
 
-Spawn a Task agent (subagent_type: Explore, model: sonnet) to search `lib/*` and `test/*` for existing code related to this task — don't assume not implemented.
+Spawn a Task agent (subagent_type: Explore, model: sonnet) to search `lib/*`, `test/*`, `config/*`, `assets/*`, and `priv/*` for existing code related to this task — don't assume not implemented.
 
 Assess: **can this task be split into independent sub-parts that touch different files?**
 - Yes, clearly independent parts → Phase 3B
