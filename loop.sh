@@ -32,7 +32,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -z "$PROMPT" ] && { echo "Usage: ./loop.sh <prompt> [--max N] [--model NAME] [--turns N] [--effort LEVEL]"; exit 0; }
+[ -z "$PROMPT" ] && { echo "Usage: ./loop.sh <prompt> [--max N] [--model NAME] [--turns N] [--effort LEVEL]"; exit 1; }
 
 I=0
 while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
