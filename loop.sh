@@ -35,6 +35,17 @@ done
 
 [ -z "$PROMPT" ] && { echo "Usage: ./loop.sh <prompt> [--max N] [--model NAME] [--turns N] [--effort LEVEL]"; exit 1; }
 
+cat <<'BANNER'
+
+  ╦  ╔═╗╔═╗╔═╗ ┌─┐┬ ┬
+  ║  ║ ║║ ║╠═╝ └─┐├─┤
+  ╩═╝╚═╝╚═╝╩  o└─┘┴ ┴
+
+BANNER
+echo "  prompt: ${PROMPT}"
+echo "  model:  ${MODEL} | turns: ${MAX_TURNS} | max: ${MAX:-unlimited}"
+echo ""
+
 I=0
 while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
     if [ -f .loop-complete ]; then
