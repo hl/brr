@@ -40,6 +40,7 @@ cat <<'BANNER'
   ╦  ╔═╗╔═╗╔═╗ ┌─┐┬ ┬
   ║  ║ ║║ ║╠═╝ └─┐├─┤
   ╩═╝╚═╝╚═╝╩  o└─┘┴ ┴
+  by Henricus Louwhoff — github.com/hl/loop
 
 BANNER
 echo "  prompt: ${PROMPT}"
