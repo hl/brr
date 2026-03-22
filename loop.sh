@@ -73,7 +73,8 @@ for line in sys.stdin:
                     detail = inp.get("command", inp.get("file_path", ""))[:80]
                     print(f"\r\033[K  \u25b8 {name}: {detail}", flush=True)
                 elif name == "Skill":
-                    print(f"\r\033[K  \u25b8 Skill: {inp.get('skill', '?')}", flush=True)
+                    skill_name = inp.get("skill", "?")
+                    print(f"\r\033[K  \u25b8 Skill: {skill_name}", flush=True)
                 else:
                     print(f"\r\033[K  \u25cb {tool_count} tool calls\u2026", end="", flush=True)
             elif bt == "text":
@@ -84,7 +85,7 @@ for line in sys.stdin:
                         print(f"\r\033[K  \u2502 {first}", flush=True)
     elif t == "result":
         print("\r\033[K", end="", flush=True)
-        cost = event.get("cost_usd")
+        cost = event.get("total_cost_usd")
         turns = event.get("num_turns")
         duration = event.get("duration_ms")
         parts = []
@@ -95,7 +96,8 @@ for line in sys.stdin:
         if cost is not None:
             parts.append(f"${cost:.2f}")
         if parts:
-            print(f"  \u2713 Done: {', '.join(parts)}", flush=True)
+            summary = ", ".join(parts)
+            print(f"  \u2713 Done: {summary}", flush=True)
 ' 2>/dev/null || true
 }
 
