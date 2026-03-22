@@ -35,27 +35,26 @@ done
 
 [ -z "$PROMPT" ] && { echo "Usage: ./loop.sh <prompt> [--max N] [--model NAME] [--turns N] [--effort LEVEL]"; exit 1; }
 
-cat <<'BANNER'
-
-  ╦  ╔═╗╔═╗╔═╗ ┌─┐┬ ┬
-  ║  ║ ║║ ║╠═╝ └─┐├─┤
-  ╩═╝╚═╝╚═╝╩  o└─┘┴ ┴
-  by Henricus Louwhoff — github.com/hl/loop
-
-BANNER
-echo "  prompt: ${PROMPT}"
-echo "  model:  ${MODEL} | turns: ${MAX_TURNS} | max: ${MAX:-unlimited}"
-echo ""
+B='\033[1m' D='\033[2m' C='\033[36m' M='\033[35m' R='\033[0m'
+printf "\n"
+printf "  ${B}${C}╦  ╔═╗╔═╗╔═╗${R} ${M}┌─┐┬ ┬${R}\n"
+printf "  ${B}${C}║  ║ ║║ ║╠═╝${R} ${M}└─┐├─┤${R}\n"
+printf "  ${B}${C}╩═╝╚═╝╚═╝╩${R}  ${M}o└─┘┴ ┴${R}\n"
+printf "  ${D}by Henricus Louwhoff — github.com/hl/loop${R}\n"
+printf "\n"
+printf "  ${D}prompt:${R} ${PROMPT}\n"
+printf "  ${D}model:${R}  ${MODEL} ${D}|${R} ${D}turns:${R} ${MAX_TURNS} ${D}|${R} ${D}max:${R} ${MAX:-unlimited}\n"
+printf "\n"
 
 I=0
 while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
     if [ -f .loop-complete ]; then
-        echo "All tasks complete (.loop-complete found). Stopping."
+        printf "\n  ${B}\033[32m✓ All tasks complete${R} (.loop-complete found). Stopping.\n"
         rm -f .loop-complete
         break
     fi
     if [ -f .loop-needs-approval ]; then
-        echo "Task needs human approval (.loop-needs-approval found):"
+        printf "\n  ${B}\033[33m⏸ Task needs human approval${R} (.loop-needs-approval found):\n"
         cat .loop-needs-approval
         rm -f .loop-needs-approval
         break
@@ -65,8 +64,7 @@ while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
     ITER_NUM=$((I + 1))
     MAX_LABEL=""
     [ "$MAX" -gt 0 ] && MAX_LABEL="/$MAX"
-    echo ""
-    echo "━━━ Iteration ${ITER_NUM}${MAX_LABEL} ▸ $(date '+%H:%M:%S') ━━━"
+    printf "\n${D}━━━${R} ${B}${C}Iteration ${ITER_NUM}${MAX_LABEL}${R} ${D}▸ $(date '+%H:%M:%S') ━━━${R}\n"
     RC=0
     if [ -f "$PROMPT" ]; then
         claude -p --dangerously-skip-permissions --model "$MODEL" --max-turns "$MAX_TURNS" ${EFFORT_FLAG[@]+"${EFFORT_FLAG[@]}"} < "$PROMPT" || RC=$?
@@ -75,9 +73,9 @@ while [ "$MAX" -eq 0 ] || [ "$I" -lt "$MAX" ]; do
     fi
     if [ "$RC" -ne 0 ]; then
         FAIL_STREAK=$((FAIL_STREAK + 1))
-        echo "Iteration $ITER_NUM failed (exit $RC). Consecutive failures: $FAIL_STREAK/$MAX_FAIL_STREAK"
+        printf "  ${B}\033[31m✗ Iteration $ITER_NUM failed${R} (exit $RC). Consecutive failures: $FAIL_STREAK/$MAX_FAIL_STREAK\n"
         if [ "$FAIL_STREAK" -ge "$MAX_FAIL_STREAK" ]; then
-            echo "Too many consecutive failures. Stopping."
+            printf "  ${B}\033[31m✗ Too many consecutive failures. Stopping.${R}\n"
             exit 1
         fi
     else
