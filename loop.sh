@@ -85,7 +85,6 @@ for line in sys.stdin:
                         print(f"\r\033[K  \u2502 {first}", flush=True)
     elif t == "result":
         print("\r\033[K", end="", flush=True)
-        cost = event.get("total_cost_usd")
         turns = event.get("num_turns")
         duration = event.get("duration_ms")
         parts = []
@@ -93,8 +92,6 @@ for line in sys.stdin:
             parts.append(f"{turns} turns")
         if duration is not None:
             parts.append(f"{duration / 60000:.1f}m")
-        if cost is not None:
-            parts.append(f"${cost:.2f}")
         if parts:
             summary = ", ".join(parts)
             print(f"  \u2713 Done: {summary}", flush=True)
