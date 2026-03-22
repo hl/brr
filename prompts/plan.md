@@ -11,15 +11,19 @@ Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
 ## Phase 2: Build Queue
 
 1. List all spec files in `docs/specs/`
-2. Create or update `IMPLEMENTATION_PLAN.md` — add a `## Spec Queue` section at the top with one line per spec:
+2. Read the `## Dependencies` section of every spec. Build a dependency graph: if spec A lists spec B in its dependencies, A should appear after B in the queue.
+3. Topologically sort specs so dependencies come before dependents. Within the same dependency depth, group specs that share the most dependencies adjacently. Leaf specs (no spec-to-spec dependencies) go first; high-level specs (CLI, web UI, dashboards) go last.
+4. Create or update `IMPLEMENTATION_PLAN.md` — add a `## Spec Queue` section at the top with one line per spec in the sorted order:
    ```
    ## Spec Queue
-   - docs/specs/example.md
+   - docs/specs/leaf-spec.md
+   - docs/specs/mid-level-spec.md
+   - docs/specs/high-level-spec.md
    ...
    ```
-3. Preserve any existing task sections below the queue
-4. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): build spec queue"`
-5. Exit
+5. Preserve any existing task sections below the queue
+6. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): build spec queue"`
+7. Exit
 
 ## Phase 3: Process Spec
 
