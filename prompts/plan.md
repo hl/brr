@@ -28,21 +28,22 @@ Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
 ## Phase 3: Process Spec
 
 1. Take the first entry from `## Spec Queue` — this is the spec to process
-2. Read that spec file, `AGENTS.md`, and the rest of `IMPLEMENTATION_PLAN.md`
-3. Search source code (`lib/*`, `test/*`, `config/*`, `assets/*`, `priv/*`) for existing implementations related to this spec. Don't assume functionality is missing — confirm with code search first.
-4. Compare the implementation against every requirement and acceptance criterion in the spec. Identify:
+2. If the spec file doesn't exist (renamed or deleted), remove it from the queue, commit, and exit. The next iteration will pick up the next spec.
+3. Read that spec file, `AGENTS.md`, and the rest of `IMPLEMENTATION_PLAN.md`
+4. Search all source and test files for existing implementations related to this spec. Don't assume functionality is missing — confirm with code search first.
+5. Compare the implementation against every requirement and acceptance criterion in the spec. Identify:
    - Missing functionality
    - Partial implementations
    - Requirements not covered by tests
    - TODOs, placeholders, stubs
    - Skipped/flaky tests
    - Known bugs
-5. Update `IMPLEMENTATION_PLAN.md`:
+6. Update `IMPLEMENTATION_PLAN.md`:
    - Add, update, or remove tasks for this spec in the task sections below the queue
    - Remove the processed spec line from `## Spec Queue`
    - If the spec is fully implemented with no gaps, don't add tasks — just remove it from the queue
-6. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): check <spec-name> against implementation"`. Skip if no changes.
-7. Exit
+7. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): check <spec-name> against implementation"`. Skip if no changes.
+8. Exit
 
 ## Phase 4: Finalize
 

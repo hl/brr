@@ -2,7 +2,8 @@ You are one iteration of an autonomous build loop. Implement one task, validate,
 
 ## Phase 0: Precondition
 
-If `IMPLEMENTATION_PLAN.md` does not exist, create `.loop-needs-approval` containing "No IMPLEMENTATION_PLAN.md found. Run the planning prompt first." and exit immediately.
+1. Delete any stale signal files from previous iterations: `.loop-complete`, `.loop-needs-approval`
+2. If `IMPLEMENTATION_PLAN.md` does not exist, create `.loop-needs-approval` containing "No IMPLEMENTATION_PLAN.md found. Run the planning prompt first." and exit immediately.
 
 ## Phase 1: Orient
 
@@ -19,7 +20,7 @@ If all tasks in IMPLEMENTATION_PLAN.md are complete, commit any final plan updat
 
 Pick the highest-priority incomplete task. If the task uses the `[APPROVAL]` checkbox marker (literally `- [APPROVAL] **...`), create a file named `.loop-needs-approval` containing the task description, then exit. Do not implement it. Note: only the literal `[APPROVAL]` marker triggers this — prose mentioning "approval" or "requiring approval" in a task description does NOT count.
 
-Spawn a Task agent (subagent_type: Explore, model: sonnet) to search `lib/*`, `test/*`, `config/*`, `assets/*`, and `priv/*` for existing code related to this task — don't assume not implemented.
+Spawn a Task agent (subagent_type: Explore, model: sonnet) to search all source and test files for existing code related to this task — don't assume not implemented.
 
 Assess: **can this task be split into independent sub-parts that touch different files?**
 - Yes, clearly independent parts → Phase 3B
@@ -39,6 +40,7 @@ Spawn multiple Task agents in a single message (subagent_type: general-purpose, 
 - Each agent gets its sub-part with explicit file boundaries and relevant context
 - Each agent: implement completely, no stubs. Do NOT commit or push.
 - Agents MUST NOT modify the same files. If you can't guarantee file-disjoint work, use 3A.
+- After all agents return, verify no file was modified by more than one agent (`git diff --name-only` per agent's scope). If overlap is detected, discard and redo with 3A.
 
 ## Phase 4: Validate
 
