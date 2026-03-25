@@ -1,66 +1,115 @@
-# Loop
+# brr
 
-Autonomous AI coding loop. Runs Claude repeatedly with a prompt — each iteration gets a fresh context window.
+Your AI agent, but unhinged.
 
-Based on [The Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook).
+brr runs a prompt in a loop, spinning up a fresh session for each iteration. Each run gets a clean context, so tasks stay focused and agents stay sharp. Point it at a list, a directory, an API, or anything that produces work — brr just keeps going.
+
+Works with any AI coding agent that accepts prompts on stdin — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), or whatever comes next. Based on [The Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook).
+
+## Install
+
+```bash
+go install github.com/hl/brr/cmd/brr@latest
+
+# or
+git clone https://github.com/hl/brr && cd brr && make build
+```
 
 ## Usage
 
 ```bash
-./loop.sh <prompt> [--max N] [--model NAME] [--turns N] [--effort LEVEL]
+# Run a prompt file in a loop
+brr prompts/build.md --max 20
+
+# Named prompt (resolves to .brr/prompts/plan.md)
+brr plan --max 3
+
+# Inline prompt
+brr "Fix all TODO comments in src/" --max 5
+
+# Use a different profile
+brr plan --max 10 -p opus
+
+# Scaffold a project
+brr init
 ```
 
-The prompt is a file path or an inline string. Flags can go in any order.
+## Configuration
 
-| Flag | Default | Description |
-| ---- | ------- | ----------- |
-| `--max` | `0` (unlimited) | Max loop iterations |
-| `--model` | `sonnet` | Claude model |
-| `--turns` | `200` | Tool-use rounds per iteration |
-| `--effort` | _(none)_ | Reasoning effort: `low`, `medium`, or `high` |
+`brr init` generates a `.brr.yaml` with agent profiles:
 
-## Examples
+```yaml
+default: claude
 
-### Plan then build
+profiles:
+  claude:
+    command: claude
+    args: [-p, --dangerously-skip-permissions, --model, sonnet, --max-turns, "200"]
+
+  opus:
+    command: claude
+    args: [-p, --dangerously-skip-permissions, --model, opus, --max-turns, "200"]
+
+  codex:
+    command: codex
+    args: [exec, --ephemeral, --dangerously-bypass-approvals-and-sandbox, --model, gpt-5.4, -]
+```
+
+Each profile defines a `command` and its `args`. The prompt is piped to stdin. Switch profiles with `-p`:
 
 ```bash
-# Plan: generate an implementation plan from specs
-./loop.sh prompts/plan.md --max 3
-
-# Build: implement one task per iteration
-./loop.sh prompts/build.md --max 20
-
-# Build with a stronger model
-./loop.sh prompts/build.md --max 20 --model opus
+brr plan --max 10            # uses default (claude)
+brr plan --max 10 -p opus    # uses opus
+brr plan --max 10 -p codex   # uses codex
 ```
 
-### Quick one-off
+Add your own profiles for any agent or configuration you want.
 
-```bash
-./loop.sh "Fix all TODO comments in src/" --max 5
-./loop.sh "Run the tests, fix anything broken" --max 10
+**Priority:** `.brr.yaml` > `~/.config/brr/config.yaml`.
+
+## Writing prompts
+
+brr doesn't care what your prompt says — it just runs it over and over. Each iteration gets a fresh context window, so the prompt needs to be self-contained: orient, pick work, do it, commit.
+
+The repo includes [`plan`](prompts/plan.md) and [`build`](prompts/build.md) example prompts. Copy them to `.brr/prompts/` and adapt, or write your own from scratch for anything:
+
+- Triage a backlog of issues
+- Run a migration across microservices
+- Review and fix lint violations one file at a time
+- Process items from a queue or API
+
+A good loop prompt follows this shape:
+
+```markdown
+You are one iteration of a loop. Do one unit of work, then exit.
+
+1. Read the state (a file, an API, a queue)
+2. Pick one item
+3. Do the work
+4. Update the state (mark it done, commit, etc.)
+5. If nothing left, create `.brr-complete` and exit
 ```
 
-## How It Works
+Put prompts in `.brr/prompts/` (per-project) or `~/.config/brr/prompts/` (global). Then `brr plan` resolves to `.brr/prompts/plan.md`. Or point at any file: `brr ./my-prompt.md`.
 
-The script loops, piping the same prompt to `claude -p --dangerously-skip-permissions` each iteration. If an iteration fails, the loop continues — but 3 consecutive failures stop the loop to avoid burning iterations on a persistent error.
+## How it works
 
-Each iteration gets a fresh context window — no degradation over long sessions. All behavior (what to implement, when to commit, when to stop) lives in the prompt, not the script.
+brr pipes the same prompt to the configured command, once per iteration. Each run gets a fresh process with a clean context window.
 
-Prompts can signal the loop to stop by creating files:
-- `.loop-complete` — all tasks done, stop the loop
-- `.loop-needs-approval` — a task needs human review, stop and print the contents
+Prompts control the loop by creating signal files:
+- `.brr-complete` — all done, stop
+- `.brr-needs-approval` — needs a human, stop and print contents
 
-These signal files are cleaned up automatically on exit.
+Three consecutive failures stop the loop automatically.
 
 ## Safety
 
-`--dangerously-skip-permissions` bypasses Claude's permission system.
+Most agent CLIs have a "skip permissions" flag for a reason — brr is designed to use it. But:
 
-- Run in isolated environments (Docker, VM)
-- Minimum viable access (only required API keys)
-- Set a max iteration count to avoid runaway loops
-- `Ctrl+C` stops the loop
+- Run in isolated environments (Docker, VM, devcontainer)
+- Minimum viable access — only the API keys you need
+- Set `--max` to bound iterations
+- `Ctrl+C` stops immediately
 
 ## References
 
