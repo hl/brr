@@ -22,7 +22,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().IntP("max", "m", 0, "max iterations (0 = unlimited)")
-	rootCmd.Flags().StringP("profile", "p", "", "agent profile from .brr.yaml")
+	rootCmd.Flags().StringP("profile", "p", "", "agent profile from .brr.yaml (uses 'default' if omitted)")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -105,10 +105,10 @@ func looksLikeFilePath(s string) bool {
 
 func printBanner() {
 	fmt.Println()
-	fmt.Printf("  %s%s╦  ╔═╗╔═╗╔═╗%s\n", ui.Bold, ui.Cyan, ui.Reset)
-	fmt.Printf("  %s%s║  ║ ║║ ║╠═╝%s\n", ui.Bold, ui.Cyan, ui.Reset)
-	fmt.Printf("  %s%s╩═╝╚═╝╚═╝╩%s\n", ui.Bold, ui.Cyan, ui.Reset)
-	fmt.Printf("  %sbrr — makes the agents go%s\n", ui.Dim, ui.Reset)
+	fmt.Printf("  %s%s╔╗ ╦═╗╦═╗%s\n", ui.Bold, ui.Cyan, ui.Reset)
+	fmt.Printf("  %s%s╠╩╗╠╦╝╠╦╝%s\n", ui.Bold, ui.Cyan, ui.Reset)
+	fmt.Printf("  %s%s╚═╝╩╚═╩╚═%s\n", ui.Bold, ui.Cyan, ui.Reset)
+	fmt.Printf("  %syour AI agent, but unhinged%s\n", ui.Dim, ui.Reset)
 	fmt.Println()
 }
 

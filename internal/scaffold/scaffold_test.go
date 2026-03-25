@@ -31,13 +31,9 @@ func TestInit(t *testing.T) {
 		t.Error("expected .brr/prompts/ to exist")
 	}
 
-	// Check AGENTS.md was created
-	data, err = os.ReadFile("AGENTS.md")
-	if err != nil {
-		t.Fatal("expected AGENTS.md to exist")
-	}
-	if !strings.Contains(string(data), "Validation") {
-		t.Error("expected Validation section in AGENTS.md")
+	// AGENTS.md should not be created
+	if _, err := os.Stat("AGENTS.md"); err == nil {
+		t.Error("expected AGENTS.md to not be created by init")
 	}
 }
 

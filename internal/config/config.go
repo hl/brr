@@ -51,7 +51,8 @@ func Load() (Config, error) {
 	}
 
 	if !found {
-		return cfg, fmt.Errorf("no config found — run 'brr init' to create .brr.yaml")
+		return cfg, fmt.Errorf("no config found (looked in .brr.yaml and ~/.config/brr/config.yaml) — run 'brr init'")
+
 	}
 
 	if err := v.Unmarshal(&cfg); err != nil {

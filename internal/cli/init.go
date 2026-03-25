@@ -10,7 +10,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Scaffold a project for brr",
-	Long:  "Generate .brr.yaml and AGENTS.md to get started.",
+	Long:  "Generate .brr.yaml and .brr/prompts/ to get started.",
 	Args:  cobra.NoArgs,
 	RunE:  runInit,
 }

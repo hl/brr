@@ -25,21 +25,17 @@ func Init(force bool) error {
 		return err
 	}
 
-	// AGENTS.md
-	if _, err := os.Stat("AGENTS.md"); err != nil {
-		if err := writeAgentsMD(); err != nil {
-			return err
-		}
-		created = append(created, "AGENTS.md")
-	}
-
 	fmt.Printf("  Created:\n")
 	for _, f := range created {
 		fmt.Printf("    %s\n", f)
 	}
 	fmt.Println()
-	fmt.Println("  Get example prompts: https://github.com/hl/brr/tree/main/prompts")
-	fmt.Println("  Put your prompts in .brr/prompts/, then: brr plan")
+	fmt.Println("  Next steps:")
+	fmt.Println("    1. Add prompts to .brr/prompts/ (e.g. plan.md, build.md)")
+	fmt.Println("    2. Run them: brr plan  →  resolves to .brr/prompts/plan.md")
+	fmt.Println()
+	fmt.Println("  Examples:  https://github.com/hl/brr/tree/main/prompts")
+	fmt.Println("  AGENTS.md: https://github.com/hl/brr/blob/main/AGENTS.md")
 
 	return nil
 }
@@ -66,26 +62,4 @@ profiles:
     args: [exec, --ephemeral, --dangerously-bypass-approvals-and-sandbox, --model, gpt-5.4, -]
 `
 	return os.WriteFile(".brr.yaml", []byte(content), 0o644)
-}
-
-func writeAgentsMD() error {
-	content := `# Agents
-
-## Validation
-
-` + "```bash\n" +
-		"# Add your validation commands here\n" +
-		"```" + `
-
-## Conventions
-
-- Commit messages: type(scope): description
-- Add project-specific conventions here
-
-## Decision Authority
-
-- Routine implementation: proceed without approval
-- Changes requiring human review: use [APPROVAL] marker in implementation plan
-`
-	return os.WriteFile("AGENTS.md", []byte(content), 0o644)
 }

@@ -8,7 +8,6 @@ You are one iteration of an autonomous build loop. Implement one task, validate,
 ## Phase 1: Orient
 
 Spawn a Task agent (subagent_type: Explore, model: sonnet) to read:
-- `docs/specs/*` — all spec files
 - `IMPLEMENTATION_PLAN.md` — task list and status
 - `AGENTS.md` — validation commands, conventions, and decision authority
 
