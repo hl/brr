@@ -11,6 +11,7 @@ import (
 var (
 	Bold    = "\033[1m"
 	Dim     = "\033[2m"
+	Blue    = "\033[34m"
 	Cyan    = "\033[36m"
 	Magenta = "\033[35m"
 	Green   = "\033[32m"
@@ -23,6 +24,7 @@ func init() {
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		Bold = ""
 		Dim = ""
+		Blue = ""
 		Cyan = ""
 		Magenta = ""
 		Green = ""

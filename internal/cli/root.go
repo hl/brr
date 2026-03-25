@@ -105,9 +105,12 @@ func looksLikeFilePath(s string) bool {
 
 func printBanner() {
 	fmt.Println()
-	fmt.Printf("  %s%s╔╗ ╦═╗╦═╗%s\n", ui.Bold, ui.Cyan, ui.Reset)
-	fmt.Printf("  %s%s╠╩╗╠╦╝╠╦╝%s\n", ui.Bold, ui.Cyan, ui.Reset)
-	fmt.Printf("  %s%s╚═╝╩╚═╩╚═%s\n", ui.Bold, ui.Cyan, ui.Reset)
+	fmt.Printf("  %s%s██████╗ ██████╗ ██████╗%s\n", ui.Bold, ui.Cyan, ui.Reset)
+	fmt.Printf("  %s%s██╔══██╗██╔══██╗██╔══██╗%s\n", ui.Bold, ui.Blue, ui.Reset)
+	fmt.Printf("  %s%s██████╔╝██████╔╝██████╔╝%s\n", ui.Bold, ui.Magenta, ui.Reset)
+	fmt.Printf("  %s%s██╔══██╗██╔══██╗██╔══██╗%s\n", ui.Bold, ui.Red, ui.Reset)
+	fmt.Printf("  %s%s██████╔╝██║  ██║██║  ██║%s\n", ui.Bold, ui.Yellow, ui.Reset)
+	fmt.Printf("  %s%s╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝%s\n", ui.Bold, ui.Green, ui.Reset)
 	fmt.Printf("  %syour AI agent, but unhinged%s\n", ui.Dim, ui.Reset)
 	fmt.Println()
 }
