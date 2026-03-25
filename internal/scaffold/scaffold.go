@@ -6,87 +6,8 @@ import (
 	"path/filepath"
 )
 
-// Recipe defines project-type-specific defaults.
-type Recipe struct {
-	Name       string
-	Validation []string
-}
-
-var recipes = map[string]Recipe{
-	"elixir": {
-		Name: "elixir",
-		Validation: []string{
-			"mix compile --warnings-as-errors",
-			"mix test",
-			"mix format --check-formatted",
-		},
-	},
-	"node": {
-		Name:       "node",
-		Validation: []string{"npm test"},
-	},
-	"go": {
-		Name: "go",
-		Validation: []string{
-			"go build ./...",
-			"go test ./...",
-			"go vet ./...",
-		},
-	},
-	"rust": {
-		Name: "rust",
-		Validation: []string{
-			"cargo build",
-			"cargo test",
-			"cargo clippy",
-		},
-	},
-	"python": {
-		Name:       "python",
-		Validation: []string{"pytest"},
-	},
-	"generic": {
-		Name:       "generic",
-		Validation: nil,
-	},
-}
-
-// Detect identifies the project type from marker files in the working directory.
-func Detect() Recipe {
-	markers := []struct {
-		file   string
-		recipe string
-	}{
-		{"mix.exs", "elixir"},
-		{"package.json", "node"},
-		{"go.mod", "go"},
-		{"Cargo.toml", "rust"},
-		{"pyproject.toml", "python"},
-	}
-
-	for _, m := range markers {
-		if _, err := os.Stat(m.file); err == nil {
-			return recipes[m.recipe]
-		}
-	}
-
-	return recipes["generic"]
-}
-
-// GetRecipe returns a recipe by name. Returns an error if the recipe doesn't exist.
-func GetRecipe(name string) (Recipe, error) {
-	if r, ok := recipes[name]; ok {
-		return r, nil
-	}
-	available := make([]string, 0, len(recipes))
-	for k := range recipes {
-		available = append(available, k)
-	}
-	return Recipe{}, fmt.Errorf("unknown recipe %q (available: %v)", name, available)
-}
-
 // Init scaffolds a project for brr.
-func Init(recipe Recipe, force bool) error {
+func Init(force bool) error {
 	created := []string{}
 
 	// .brr.yaml
@@ -106,26 +27,12 @@ func Init(recipe Recipe, force bool) error {
 
 	// AGENTS.md
 	if _, err := os.Stat("AGENTS.md"); err != nil {
-		if err := writeAgentsMD(recipe); err != nil {
+		if err := writeAgentsMD(); err != nil {
 			return err
 		}
 		created = append(created, "AGENTS.md")
 	}
 
-	// docs/specs/
-	specDir := "docs/specs"
-	if err := os.MkdirAll(specDir, 0o755); err != nil {
-		return err
-	}
-	gitkeep := filepath.Join(specDir, ".gitkeep")
-	if _, err := os.Stat(gitkeep); err != nil {
-		if err := os.WriteFile(gitkeep, nil, 0o644); err != nil {
-			return fmt.Errorf("writing %s: %w", gitkeep, err)
-		}
-		created = append(created, specDir+"/")
-	}
-
-	fmt.Printf("  Detected: %s\n", recipe.Name)
 	fmt.Printf("  Created:\n")
 	for _, f := range created {
 		fmt.Printf("    %s\n", f)
@@ -161,22 +68,14 @@ profiles:
 	return os.WriteFile(".brr.yaml", []byte(content), 0o644)
 }
 
-func writeAgentsMD(r Recipe) error {
+func writeAgentsMD() error {
 	content := `# Agents
 
 ## Validation
 
-` + "```bash\n"
-
-	if len(r.Validation) > 0 {
-		for _, v := range r.Validation {
-			content += v + "\n"
-		}
-	} else {
-		content += "# Add your validation commands here\n"
-	}
-
-	content += "```" + `
+` + "```bash\n" +
+		"# Add your validation commands here\n" +
+		"```" + `
 
 ## Conventions
 
