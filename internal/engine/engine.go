@@ -49,25 +49,36 @@ func Run(opts Options) error {
 	var mu sync.Mutex
 	var currentCmd *exec.Cmd
 
-	var interrupted atomic.Bool
+	// Signal handling: three levels
+	// 1st Ctrl+C: finish current iteration, then stop
+	// 2nd Ctrl+C: send SIGINT to child (graceful shutdown)
+	// 3rd Ctrl+C: force kill child
+	var stopping atomic.Bool
+	var sigCount atomic.Int32
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 
 	go func() {
-		first := true
 		for range sigCh {
-			interrupted.Store(true)
-			mu.Lock()
-			cmd := currentCmd
-			mu.Unlock()
-			if cmd != nil && cmd.Process != nil {
-				if first {
-					// Signal the entire process group (child + its descendants)
+			n := sigCount.Add(1)
+			switch n {
+			case 1:
+				stopping.Store(true)
+				fmt.Printf("\n  %s%s⏳ Finishing current iteration...%s (Ctrl+C again to interrupt now)\n",
+					ui.Bold, ui.Yellow, ui.Reset)
+			case 2:
+				mu.Lock()
+				cmd := currentCmd
+				mu.Unlock()
+				if cmd != nil && cmd.Process != nil {
 					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
-					first = false
-				} else {
-					// Second signal: force kill the process group
+				}
+			default:
+				mu.Lock()
+				cmd := currentCmd
+				mu.Unlock()
+				if cmd != nil && cmd.Process != nil {
 					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 				}
 			}
@@ -78,7 +89,7 @@ func Run(opts Options) error {
 	i := 0
 
 	for opts.Max == 0 || i < opts.Max {
-		if interrupted.Load() {
+		if stopping.Load() && sigCount.Load() >= 2 {
 			fmt.Printf("\n  %s%sInterrupted%s. Stopping.\n", ui.Bold, ui.Yellow, ui.Reset)
 			return nil
 		}
@@ -100,7 +111,7 @@ func Run(opts Options) error {
 		)
 
 		// Run the command with prompt piped to stdin.
-		// Use a process group so Ctrl+C kills the entire child tree.
+		// Use a process group so signals can target the entire child tree.
 		cmd := exec.Command(opts.Command[0], opts.Command[1:]...)
 		cmd.Stdin = strings.NewReader(opts.Prompt)
 		cmd.Stdout = os.Stdout
@@ -117,12 +128,14 @@ func Run(opts Options) error {
 		currentCmd = nil
 		mu.Unlock()
 
-		// Check for interrupt or signal files immediately after subprocess exits
-		if interrupted.Load() {
-			fmt.Printf("\n  %s%sInterrupted%s. Stopping.\n", ui.Bold, ui.Yellow, ui.Reset)
+		// Check for signal files immediately after subprocess exits
+		if stop := checkSignalFiles(); stop {
 			return nil
 		}
-		if stop := checkSignalFiles(); stop {
+
+		// If user requested stop (first Ctrl+C), exit gracefully now that the iteration is done
+		if stopping.Load() {
+			fmt.Printf("\n  %s%sStopped after iteration %d%s.\n", ui.Bold, ui.Yellow, iterNum, ui.Reset)
 			return nil
 		}
 
