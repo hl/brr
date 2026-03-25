@@ -35,6 +35,58 @@ func TestInit(t *testing.T) {
 	if _, err := os.Stat("AGENTS.md"); err == nil {
 		t.Error("expected AGENTS.md to not be created by init")
 	}
+
+	// Check .gitignore was created with brr entries
+	gitignore, err := os.ReadFile(".gitignore")
+	if err != nil {
+		t.Fatal("expected .gitignore to exist")
+	}
+	for _, entry := range []string{".brr-complete", ".brr-needs-approval"} {
+		if !strings.Contains(string(gitignore), entry) {
+			t.Errorf("expected %q in .gitignore", entry)
+		}
+	}
+}
+
+func TestInitGitignoreAppendsToExisting(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	os.WriteFile(".gitignore", []byte("node_modules/\n"), 0o644)
+
+	if err := Init(false); err != nil {
+		t.Fatalf("Init error: %v", err)
+	}
+
+	data, err := os.ReadFile(".gitignore")
+	if err != nil {
+		t.Fatal("expected .gitignore to exist")
+	}
+	content := string(data)
+
+	// Existing content preserved
+	if !strings.Contains(content, "node_modules/") {
+		t.Error("expected existing .gitignore content to be preserved")
+	}
+	// brr entries added
+	if !strings.Contains(content, ".brr-complete") {
+		t.Error("expected .brr-complete in .gitignore")
+	}
+}
+
+func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n"), 0o644)
+
+	if err := Init(false); err != nil {
+		t.Fatalf("Init error: %v", err)
+	}
+
+	data, _ := os.ReadFile(".gitignore")
+	// Should not have duplicate "# brr" section
+	if strings.Contains(string(data), "# brr") {
+		t.Error("expected no brr section when all entries already present")
+	}
 }
 
 func TestInitAlreadyExists(t *testing.T) {

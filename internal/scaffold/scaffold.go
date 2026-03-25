@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Init scaffolds a project for brr.
@@ -25,6 +26,12 @@ func Init(force bool) error {
 		return err
 	}
 
+	// .gitignore — append brr entries if missing
+	gitignoreUpdated := updateGitignore()
+	if gitignoreUpdated {
+		created = append(created, ".gitignore (updated)")
+	}
+
 	fmt.Printf("  Created:\n")
 	for _, f := range created {
 		fmt.Printf("    %s\n", f)
@@ -38,6 +45,48 @@ func Init(force bool) error {
 	fmt.Println("  AGENTS.md: https://github.com/hl/brr/blob/main/AGENTS.md")
 
 	return nil
+}
+
+// gitignoreEntries are lines brr needs in .gitignore.
+var gitignoreEntries = []string{
+	".brr-complete",
+	".brr-needs-approval",
+}
+
+// updateGitignore appends missing brr entries to .gitignore.
+// Returns true if any entries were added.
+func updateGitignore() bool {
+	existing, _ := os.ReadFile(".gitignore")
+	content := string(existing)
+
+	var missing []string
+	for _, entry := range gitignoreEntries {
+		if !strings.Contains(content, entry) {
+			missing = append(missing, entry)
+		}
+	}
+
+	if len(missing) == 0 {
+		return false
+	}
+
+	f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	// Add a blank line separator if file doesn't end with newline
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		f.WriteString("\n")
+	}
+
+	f.WriteString("\n# brr\n")
+	for _, entry := range missing {
+		f.WriteString(entry + "\n")
+	}
+
+	return true
 }
 
 func writeBrrYAML() error {
