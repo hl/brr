@@ -1,0 +1,17 @@
+version: "2"
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+  exclusions:
+    rules:
+      # Signal file cleanup is best-effort
+      - path: internal/engine/engine\.go
+        linters: [errcheck]
+        text: "os\\.Remove"
+      # Test helpers — unchecked os calls in test setup are fine
+      - path: _test\.go
+        linters: [errcheck]

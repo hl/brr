@@ -55,7 +55,7 @@ Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
    - Delete the empty `## Spec Queue` section
    - Delete empty phase headings
 3. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): finalize implementation plan"`. Skip if no changes.
-4. Create `.loop-complete`
+4. Create `.brr-complete`
 5. Exit
 
 ## Task format rules

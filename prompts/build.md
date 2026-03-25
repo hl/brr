@@ -2,8 +2,8 @@ You are one iteration of an autonomous build loop. Implement one task, validate,
 
 ## Phase 0: Precondition
 
-1. Delete any stale signal files from previous iterations: `.loop-complete`, `.loop-needs-approval`
-2. If `IMPLEMENTATION_PLAN.md` does not exist, create `.loop-needs-approval` containing "No IMPLEMENTATION_PLAN.md found. Run the planning prompt first." and exit immediately.
+1. Delete any stale signal files from previous iterations: `.brr-complete`, `.brr-needs-approval`
+2. If `IMPLEMENTATION_PLAN.md` does not exist, create `.brr-needs-approval` containing "No IMPLEMENTATION_PLAN.md found. Run the planning prompt first." and exit immediately.
 
 ## Phase 1: Orient
 
@@ -16,9 +16,9 @@ Wait for the agent to return before proceeding.
 
 ## Phase 2: Select
 
-If all tasks in IMPLEMENTATION_PLAN.md are complete, commit any final plan updates first, then create a file named `.loop-complete` on disk (do NOT stage or commit this file — it is a signal to the loop script, not part of the repo) and exit. Do not continue.
+If all tasks in IMPLEMENTATION_PLAN.md are complete, commit any final plan updates first, then create a file named `.brr-complete` on disk (do NOT stage or commit this file — it is a signal to brr, not part of the repo) and exit. Do not continue.
 
-Pick the highest-priority incomplete task. If the task uses the `[APPROVAL]` checkbox marker (literally `- [APPROVAL] **...`), create a file named `.loop-needs-approval` containing the task description, then exit. Do not implement it. Note: only the literal `[APPROVAL]` marker triggers this — prose mentioning "approval" or "requiring approval" in a task description does NOT count.
+Pick the highest-priority incomplete task. If the task uses the `[APPROVAL]` checkbox marker (literally `- [APPROVAL] **...`), create a file named `.brr-needs-approval` containing the task description, then exit. Do not implement it. Note: only the literal `[APPROVAL]` marker triggers this — prose mentioning "approval" or "requiring approval" in a task description does NOT count.
 
 Spawn a Task agent (subagent_type: Explore, model: sonnet) to search all source and test files for existing code related to this task — don't assume not implemented.
 
