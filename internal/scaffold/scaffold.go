@@ -25,9 +25,13 @@ func Init(force bool) error {
 	if err := os.MkdirAll(promptDir, 0o755); err != nil {
 		return err
 	}
+	created = append(created, ".brr/prompts/")
 
 	// .gitignore — append brr entries if missing
-	gitignoreUpdated := updateGitignore()
+	gitignoreUpdated, err := updateGitignore()
+	if err != nil {
+		return fmt.Errorf("updating .gitignore: %w", err)
+	}
 	if gitignoreUpdated {
 		created = append(created, ".gitignore (updated)")
 	}
@@ -55,8 +59,11 @@ var gitignoreEntries = []string{
 
 // updateGitignore appends missing brr entries to .gitignore.
 // Returns true if any entries were added.
-func updateGitignore() bool {
-	existing, _ := os.ReadFile(".gitignore")
+func updateGitignore() (bool, error) {
+	existing, err := os.ReadFile(".gitignore")
+	if err != nil && !os.IsNotExist(err) {
+		return false, err
+	}
 	content := string(existing)
 
 	var missing []string
@@ -67,26 +74,33 @@ func updateGitignore() bool {
 	}
 
 	if len(missing) == 0 {
-		return false
+		return false, nil
+	}
+
+	var buf strings.Builder
+	// Add a blank line separator if file doesn't end with newline
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		buf.WriteString("\n")
+	}
+	buf.WriteString("\n# brr\n")
+	for _, entry := range missing {
+		buf.WriteString(entry + "\n")
 	}
 
 	f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return false
+		return false, err
 	}
-	defer f.Close()
-
-	// Add a blank line separator if file doesn't end with newline
-	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
-		f.WriteString("\n")
+	_, writeErr := f.WriteString(buf.String())
+	closeErr := f.Close()
+	if writeErr != nil {
+		return false, writeErr
 	}
-
-	f.WriteString("\n# brr\n")
-	for _, entry := range missing {
-		f.WriteString(entry + "\n")
+	if closeErr != nil {
+		return false, closeErr
 	}
 
-	return true
+	return true, nil
 }
 
 func writeBrrYAML() error {

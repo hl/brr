@@ -51,7 +51,9 @@ func TestInit(t *testing.T) {
 func TestInitGitignoreAppendsToExisting(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	os.WriteFile(".gitignore", []byte("node_modules/\n"), 0o644)
+	if err := os.WriteFile(".gitignore", []byte("node_modules/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := Init(false); err != nil {
 		t.Fatalf("Init error: %v", err)
@@ -76,13 +78,18 @@ func TestInitGitignoreAppendsToExisting(t *testing.T) {
 func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n"), 0o644)
+	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := Init(false); err != nil {
 		t.Fatalf("Init error: %v", err)
 	}
 
-	data, _ := os.ReadFile(".gitignore")
+	data, err := os.ReadFile(".gitignore")
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Should not have duplicate "# brr" section
 	if strings.Contains(string(data), "# brr") {
 		t.Error("expected no brr section when all entries already present")
@@ -92,7 +99,9 @@ func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
 func TestInitAlreadyExists(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	os.WriteFile(".brr.yaml", []byte("existing"), 0o644)
+	if err := os.WriteFile(".brr.yaml", []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	err := Init(false)
 	if err == nil {
@@ -103,7 +112,9 @@ func TestInitAlreadyExists(t *testing.T) {
 func TestInitForce(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	os.WriteFile(".brr.yaml", []byte("existing"), 0o644)
+	if err := os.WriteFile(".brr.yaml", []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := Init(true); err != nil {
 		t.Fatalf("Init with force error: %v", err)
