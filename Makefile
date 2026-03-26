@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt vet check clean
+.PHONY: build test lint fmt vet check clean cross-build
 
 # Build the brr binary
 build:
@@ -24,8 +24,18 @@ fmt-fix:
 vet:
 	mise exec -- go vet ./...
 
+# Cross-compile for all release targets (matches .goreleaser.yaml)
+cross-build:
+	@for os in linux darwin windows; do \
+		for arch in amd64 arm64; do \
+			echo "  building $$os/$$arch..."; \
+			GOOS=$$os GOARCH=$$arch mise exec -- go build ./... || exit 1; \
+		done; \
+	done
+	@echo "  all targets OK"
+
 # Run all quality gates (use this before committing)
-check: fmt vet lint test build
+check: fmt vet lint test build cross-build
 
 # Clean build artifacts
 clean:

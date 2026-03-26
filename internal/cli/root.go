@@ -70,13 +70,11 @@ func run(cmd *cobra.Command, args []string) error {
 
 // resolvePrompt reads a prompt from a file path, .brr/prompts/<name>.md, or returns it as inline text.
 func resolvePrompt(nameOrPath string) (string, error) {
-	// If it's an existing file on disk, read it directly
-	if _, statErr := os.Stat(nameOrPath); statErr == nil {
-		data, err := os.ReadFile(nameOrPath)
-		if err != nil {
-			return "", fmt.Errorf("reading prompt file: %w", err)
-		}
+	// Try reading as a file directly (single syscall, no TOCTOU race)
+	if data, err := os.ReadFile(nameOrPath); err == nil {
 		return string(data), nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("reading prompt file: %w", err)
 	} else if looksLikeFilePath(nameOrPath) {
 		// It looks like a file path but doesn't exist — that's an error, not inline text
 		return "", fmt.Errorf("prompt file not found: %s", nameOrPath)
@@ -114,11 +112,13 @@ func resolvePrompt(nameOrPath string) (string, error) {
 	return nameOrPath, nil
 }
 
-// looksLikeFilePath returns true if s looks like a file path (has path separator
-// or a recognized prompt file extension).
+// looksLikeFilePath returns true if s looks like a file path rather than inline
+// prompt text. A string with spaces is always treated as inline text. Otherwise,
+// it's a file path if it has a recognized prompt extension.
 func looksLikeFilePath(s string) bool {
-	if strings.ContainsRune(s, os.PathSeparator) {
-		return true
+	// Inline text (contains spaces) is never a file path
+	if strings.Contains(s, " ") {
+		return false
 	}
 	ext := filepath.Ext(s)
 	switch ext {

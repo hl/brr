@@ -85,9 +85,50 @@ func TestResolvePromptDottedInlineText(t *testing.T) {
 	}
 }
 
-func TestLooksLikeFilePathWithSeparator(t *testing.T) {
-	if !looksLikeFilePath("path/to/file") {
-		t.Error("expected true for path with separator")
+func TestResolvePromptInlineTextWithSlash(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Inline prompts containing slashes should work (README example)
+	text, err := resolvePrompt("Fix all TODO comments in src/")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if text != "Fix all TODO comments in src/" {
+		t.Errorf("expected inline text, got %q", text)
+	}
+}
+
+func TestResolvePromptInlineTextWithPathInMiddle(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	text, err := resolvePrompt("Refactor pkg/config/loader.go to use generics")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if text != "Refactor pkg/config/loader.go to use generics" {
+		t.Errorf("expected inline text, got %q", text)
+	}
+}
+
+func TestLooksLikeFilePathWithSeparatorNoSpaces(t *testing.T) {
+	// A path-like string without spaces that isn't an existing file
+	// is NOT a file path (no recognized extension)
+	if looksLikeFilePath("path/to/file") {
+		t.Error("expected false for path without recognized extension")
+	}
+}
+
+func TestLooksLikeFilePathWithSeparatorAndExtension(t *testing.T) {
+	// path/to/file.md without spaces IS a file path
+	if !looksLikeFilePath("path/to/file.md") {
+		t.Error("expected true for path with .md extension")
+	}
+}
+
+func TestLooksLikeFilePathWithSpaces(t *testing.T) {
+	// Text with spaces is always inline text, even with slashes
+	if looksLikeFilePath("Fix stuff in src/") {
+		t.Error("expected false for text with spaces")
 	}
 }
 

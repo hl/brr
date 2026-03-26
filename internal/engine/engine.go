@@ -28,6 +28,14 @@ func Run(opts Options) error {
 		return fmt.Errorf("no command configured — set 'command' in .brr.yaml")
 	}
 
+	// If signal files exist from a previous run, respect them immediately
+	if stop := checkSignalFiles(); stop {
+		// Clean up the signal files so they don't block subsequent runs
+		os.Remove(ui.SignalComplete)
+		os.Remove(ui.SignalNeedsApproval)
+		return nil
+	}
+
 	// Clean up stale signal files from previous runs
 	os.Remove(ui.SignalComplete)
 	os.Remove(ui.SignalNeedsApproval)
@@ -54,7 +62,7 @@ func Run(opts Options) error {
 	// 3rd Ctrl+C: force kill child
 	var stopping atomic.Bool
 	var sigCount atomic.Int32
-	sigCh := make(chan os.Signal, 1)
+	sigCh := make(chan os.Signal, 3)
 	done := make(chan struct{})
 	notifySignals(sigCh)
 	defer signal.Stop(sigCh)
@@ -64,10 +72,24 @@ func Run(opts Options) error {
 			select {
 			case <-done:
 				return
-			case _, ok := <-sigCh:
+			case sig, ok := <-sigCh:
 				if !ok {
 					return
 				}
+				// SIGTERM: forward to child immediately for graceful shutdown
+				if sig == sigTERM {
+					stopping.Store(true)
+					mu.Lock()
+					cmd := currentCmd
+					mu.Unlock()
+					if cmd != nil && cmd.Process != nil {
+						_ = killGroup(cmd, sigTERM)
+					}
+					fmt.Printf("\n  %s%s⏳ SIGTERM received, forwarding to child...%s\n",
+						ui.Bold, ui.Yellow, ui.Reset)
+					continue
+				}
+				// SIGINT (Ctrl+C): three escalation levels
 				n := sigCount.Add(1)
 				switch n {
 				case 1:
@@ -179,13 +201,17 @@ func checkSignalFiles() bool {
 		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, ui.SignalComplete)
 		return true
 	}
-	if data, err := os.ReadFile(ui.SignalNeedsApproval); err == nil {
+	if _, err := os.Stat(ui.SignalNeedsApproval); err == nil {
 		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
-		content := strings.TrimSpace(string(data))
-		if content != "" {
-			fmt.Println(content)
+		if data, readErr := os.ReadFile(ui.SignalNeedsApproval); readErr == nil {
+			content := strings.TrimSpace(string(data))
+			if content != "" {
+				fmt.Println(content)
+			} else {
+				fmt.Println("  (no details provided)")
+			}
 		} else {
-			fmt.Println("  (no details provided)")
+			fmt.Printf("  (could not read details: %v)\n", readErr)
 		}
 		return true
 	}

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/hl/brr/internal/ui"
@@ -19,12 +20,13 @@ func TestRunEmptyCommand(t *testing.T) {
 func TestRunMaxIterations(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// "true" always exits 0 on Unix; "cmd /c exit 0" on Windows
+	// Child appends to a counter file so we can verify iteration count
+	counter := filepath.Join(".", "counter")
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "exit", "0"}
+		cmd = []string{"cmd", "/c", "echo", "x", ">>", counter}
 	} else {
-		cmd = []string{"true"}
+		cmd = []string{"sh", "-c", "echo x >> " + counter}
 	}
 
 	err := Run(Options{
@@ -34,6 +36,15 @@ func TestRunMaxIterations(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(counter)
+	if err != nil {
+		t.Fatal("counter file not created")
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 3 {
+		t.Errorf("expected 3 iterations, got %d", len(lines))
 	}
 }
 
@@ -66,11 +77,13 @@ func TestRunSignalFileComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Use a command that creates a marker file so we can verify it never ran
+	marker := filepath.Join(".", "child-ran")
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "echo", "hello"}
+		cmd = []string{"cmd", "/c", "echo", "ran", ">", marker}
 	} else {
-		cmd = []string{"echo", "hello"}
+		cmd = []string{"sh", "-c", "touch " + marker}
 	}
 
 	err := Run(Options{
@@ -80,6 +93,11 @@ func TestRunSignalFileComplete(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The child should never have run because the signal file pre-existed
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("child process ran despite pre-existing .brr-complete signal file")
 	}
 }
 
@@ -90,11 +108,13 @@ func TestRunSignalFileNeedsApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Use a command that creates a marker file so we can verify it never ran
+	marker := filepath.Join(".", "child-ran")
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "echo", "hello"}
+		cmd = []string{"cmd", "/c", "echo", "ran", ">", marker}
 	} else {
-		cmd = []string{"echo", "hello"}
+		cmd = []string{"sh", "-c", "touch " + marker}
 	}
 
 	err := Run(Options{
@@ -104,6 +124,11 @@ func TestRunSignalFileNeedsApproval(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The child should never have run because the signal file pre-existed
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("child process ran despite pre-existing .brr-needs-approval signal file")
 	}
 }
 
@@ -159,5 +184,54 @@ func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 
 	if !checkSignalFiles() {
 		t.Error("expected true when .brr-needs-approval exists")
+	}
+}
+
+func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Write-only file: Stat succeeds but ReadFile fails
+	if err := os.WriteFile(ui.SignalNeedsApproval, []byte("secret"), 0o200); err != nil {
+		t.Fatal(err)
+	}
+	// Make it truly unreadable (not owner-writable-only, but no read)
+	if err := os.Chmod(ui.SignalNeedsApproval, 0o000); err != nil {
+		t.Skip("cannot remove read permission")
+	}
+	defer os.Chmod(ui.SignalNeedsApproval, 0o644)
+
+	if !checkSignalFiles() {
+		t.Error("expected true when .brr-needs-approval exists but is unreadable")
+	}
+}
+
+func TestRunSignalFileCleanedAfterEarlyStop(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Pre-existing signal file should be cleaned up after the engine returns
+	if err := os.WriteFile(ui.SignalComplete, []byte("done"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	marker := filepath.Join(".", "child-ran")
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "echo", "ran", ">", marker}
+	} else {
+		cmd = []string{"sh", "-c", "touch " + marker}
+	}
+
+	err := Run(Options{
+		Prompt:  "test",
+		Max:     5,
+		Command: cmd,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Signal file should have been cleaned up
+	if _, err := os.Stat(ui.SignalComplete); err == nil {
+		t.Error("expected .brr-complete to be cleaned up after early stop")
 	}
 }

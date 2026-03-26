@@ -14,3 +14,6 @@ func notifySignals(ch chan<- os.Signal) {
 
 const sigINT = syscall.SIGINT
 const sigKILL = syscall.SIGKILL
+
+// sigTERM is not delivered on Windows but is needed for compilation.
+const sigTERM = syscall.Signal(0xf)

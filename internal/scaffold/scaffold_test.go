@@ -128,3 +128,115 @@ func TestInitForce(t *testing.T) {
 		t.Error("expected .brr.yaml to be overwritten")
 	}
 }
+
+func TestInitSymlinkYAMLRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Create a symlink .brr.yaml -> /tmp/target
+	target := filepath.Join(t.TempDir(), "target.yaml")
+	if err := os.WriteFile(target, []byte("target"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ".brr.yaml"); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	err := Init(true)
+	if err == nil {
+		t.Error("expected error when .brr.yaml is a symlink")
+	}
+	if err != nil && !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("expected symlink error, got: %v", err)
+	}
+}
+
+func TestInitSymlinkGitignoreRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	target := filepath.Join(t.TempDir(), "target-gitignore")
+	if err := os.WriteFile(target, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ".gitignore"); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	err := Init(false)
+	if err == nil {
+		t.Error("expected error when .gitignore is a symlink")
+	}
+	if err != nil && !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("expected symlink error, got: %v", err)
+	}
+}
+
+func TestInitSymlinkBrrDirRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	target := filepath.Join(t.TempDir(), "target-brr-dir")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ".brr"); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	err := Init(false)
+	if err == nil {
+		t.Error("expected error when .brr is a symlink")
+	}
+	if err != nil && !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("expected symlink error, got: %v", err)
+	}
+}
+
+func TestInitWriteOnlyYAMLRequiresForce(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Create a write-only .brr.yaml — Lstat should detect existence
+	if err := os.WriteFile(".brr.yaml", []byte("existing"), 0o200); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Init(false)
+	if err == nil {
+		t.Error("expected error when write-only .brr.yaml exists without --force")
+	}
+}
+
+func TestInitGitignoreCommentedEntriesNotMatched(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Commented-out entries should not prevent real entries from being added
+	if err := os.WriteFile(".gitignore", []byte("# .brr-complete\n# .brr-needs-approval\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Init(false); err != nil {
+		t.Fatalf("Init error: %v", err)
+	}
+
+	data, err := os.ReadFile(".gitignore")
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+
+	// Should have the brr section with actual entries
+	if !strings.Contains(content, "# brr\n") {
+		t.Error("expected brr section to be added when only commented entries exist")
+	}
+
+	// Count actual (non-commented) occurrences
+	lines := strings.Split(content, "\n")
+	realEntries := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == ".brr-complete" || trimmed == ".brr-needs-approval" {
+			realEntries++
+		}
+	}
+	if realEntries != 2 {
+		t.Errorf("expected 2 real gitignore entries, got %d", realEntries)
+	}
+}

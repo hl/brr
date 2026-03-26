@@ -9,29 +9,54 @@ import (
 
 // Init scaffolds a project for brr.
 func Init(force bool) error {
-	created := []string{}
+	// Pre-flight: reject symlinks to prevent writes outside the repo
+	for _, path := range []string{".brr.yaml", ".gitignore", ".brr"} {
+		if err := rejectSymlink(path); err != nil {
+			return err
+		}
+	}
 
-	// .brr.yaml
-	if _, err := os.Stat(".brr.yaml"); err == nil && !force {
+	// Check if .brr.yaml exists using Lstat (works even for write-only files)
+	_, lstatErr := os.Lstat(".brr.yaml")
+	yamlExists := lstatErr == nil
+
+	if yamlExists && !force {
 		return fmt.Errorf(".brr.yaml already exists (use --force to overwrite)")
 	}
+
+	// Best-effort backup for rollback (may fail for write-only files, that's OK)
+	var existingYAML []byte
+	if yamlExists {
+		existingYAML, _ = os.ReadFile(".brr.yaml")
+	}
+
+	// Track whether we created the prompts dir (for rollback)
+	promptDir := filepath.Join(".brr", "prompts")
+	_, promptDirExisted := os.Stat(promptDir)
+
+	// Stage 1: write .brr.yaml
 	if err := writeBrrYAML(); err != nil {
 		return err
 	}
-	created = append(created, ".brr.yaml")
 
-	// .brr/prompts/ — create directory for user prompts
-	promptDir := filepath.Join(".brr", "prompts")
+	// Stage 2: create .brr/prompts/
 	if err := os.MkdirAll(promptDir, 0o755); err != nil {
+		restoreFile(".brr.yaml", existingYAML, yamlExists)
 		return err
 	}
-	created = append(created, ".brr/prompts/")
 
-	// .gitignore — append brr entries if missing
+	// Stage 3: update .gitignore
 	gitignoreUpdated, err := updateGitignore()
 	if err != nil {
+		restoreFile(".brr.yaml", existingYAML, yamlExists)
+		// Remove .brr/prompts/ only if we created it
+		if promptDirExisted != nil {
+			_ = os.Remove(promptDir)
+		}
 		return fmt.Errorf("updating .gitignore: %w", err)
 	}
+
+	created := []string{".brr.yaml", ".brr/prompts/"}
 	if gitignoreUpdated {
 		created = append(created, ".gitignore (updated)")
 	}
@@ -51,6 +76,27 @@ func Init(force bool) error {
 	return nil
 }
 
+// rejectSymlink returns an error if path exists and is a symlink.
+func rejectSymlink(path string) error {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return nil // doesn't exist, fine
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symlink — refusing to overwrite (security risk)", path)
+	}
+	return nil
+}
+
+// restoreFile restores a file to its previous state.
+func restoreFile(path string, data []byte, existed bool) {
+	if existed && data != nil {
+		_ = os.WriteFile(path, data, 0o644)
+	} else if !existed {
+		_ = os.Remove(path)
+	}
+}
+
 // gitignoreEntries are lines brr needs in .gitignore.
 var gitignoreEntries = []string{
 	".brr-complete",
@@ -66,9 +112,18 @@ func updateGitignore() (bool, error) {
 	}
 	content := string(existing)
 
+	// Parse existing lines to find exact matches (ignoring comments and whitespace)
+	existingLines := make(map[string]bool)
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			existingLines[trimmed] = true
+		}
+	}
+
 	var missing []string
 	for _, entry := range gitignoreEntries {
-		if !strings.Contains(content, entry) {
+		if !existingLines[entry] {
 			missing = append(missing, entry)
 		}
 	}

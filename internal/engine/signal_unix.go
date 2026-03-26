@@ -14,3 +14,4 @@ func notifySignals(ch chan<- os.Signal) {
 
 const sigINT = syscall.SIGINT
 const sigKILL = syscall.SIGKILL
+const sigTERM = syscall.SIGTERM
