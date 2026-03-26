@@ -52,7 +52,11 @@ func Load() (Config, error) {
 	}
 
 	if !found {
-		return cfg, fmt.Errorf("no config found (looked in .brr.yaml and ~/.config/brr/config.yaml) — run 'brr init'")
+		configHint := "<config-dir>/brr/config.yaml"
+		if configDir, err := os.UserConfigDir(); err == nil {
+			configHint = filepath.Join(configDir, "brr", "config.yaml")
+		}
+		return cfg, fmt.Errorf("no config found (looked in .brr.yaml and %s) — run 'brr init'", configHint)
 	}
 
 	if err := v.Unmarshal(&cfg); err != nil {

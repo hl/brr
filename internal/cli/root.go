@@ -70,11 +70,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 // resolvePrompt reads a prompt from a file path, .brr/prompts/<name>.md, or returns it as inline text.
 func resolvePrompt(nameOrPath string) (string, error) {
-	// Try reading as a file directly (single syscall, no TOCTOU race)
-	if data, err := os.ReadFile(nameOrPath); err == nil {
-		return string(data), nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("reading prompt file: %w", err)
+	// If it's an existing regular file, read it directly
+	if fi, statErr := os.Stat(nameOrPath); statErr == nil {
+		if fi.IsDir() {
+			// Don't treat directories as prompt files — fall through to named prompt lookup
+		} else if data, err := os.ReadFile(nameOrPath); err == nil {
+			return string(data), nil
+		} else {
+			return "", fmt.Errorf("reading prompt file: %w", err)
+		}
 	} else if looksLikeFilePath(nameOrPath) {
 		// It looks like a file path but doesn't exist — that's an error, not inline text
 		return "", fmt.Errorf("prompt file not found: %s", nameOrPath)

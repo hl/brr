@@ -65,7 +65,7 @@ brr plan --max 10 -p codex   # uses codex
 
 Add your own profiles for any agent or configuration you want.
 
-**Priority:** `.brr.yaml` > `~/.config/brr/config.yaml`.
+**Priority:** `.brr.yaml` > `<os-config-dir>/brr/config.yaml` (e.g. `~/.config/brr/` on Linux, `~/Library/Application Support/brr/` on macOS, `%AppData%\brr\` on Windows).
 
 ## Writing prompts
 
@@ -90,7 +90,7 @@ You are one iteration of a loop. Do one unit of work, then exit.
 5. If nothing left, create `.brr-complete` and exit
 ```
 
-Put prompts in `.brr/prompts/` (per-project) or `~/.config/brr/prompts/` (global). Then `brr plan` resolves to `.brr/prompts/plan.md`. Or point at any file: `brr ./my-prompt.md`.
+Put prompts in `.brr/prompts/` (per-project) or `<os-config-dir>/brr/prompts/` (global). Then `brr plan` resolves to `.brr/prompts/plan.md`. Or point at any file: `brr ./my-prompt.md`.
 
 ## How it works
 
@@ -109,7 +109,7 @@ Most agent CLIs have a "skip permissions" flag for a reason — brr is designed 
 - Run in isolated environments (Docker, VM, devcontainer)
 - Minimum viable access — only the API keys you need
 - Set `--max` to bound iterations
-- `Ctrl+C` stops immediately
+- `Ctrl+C` stops gracefully (1st: finish current iteration; 2nd: interrupt child; 3rd: force kill)
 
 ## References
 

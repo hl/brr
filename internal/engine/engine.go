@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/hl/brr/internal/ui"
 )
+
+const maxApprovalFileSize = 4096
 
 const maxFailStreak = 3
 
@@ -194,26 +197,53 @@ func Run(opts Options) error {
 	return nil
 }
 
+// isRegularFile returns true if path exists and is a regular file (not a symlink, dir, etc.).
+func isRegularFile(path string) bool {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	return fi.Mode().IsRegular()
+}
+
 // checkSignalFiles checks for .brr-complete and .brr-needs-approval.
+// Only regular files are treated as signals (symlinks and directories are ignored).
 // Returns true if the engine should stop.
 func checkSignalFiles() bool {
-	if _, err := os.Stat(ui.SignalComplete); err == nil {
+	if isRegularFile(ui.SignalComplete) {
 		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, ui.SignalComplete)
 		return true
 	}
-	if _, err := os.Stat(ui.SignalNeedsApproval); err == nil {
+	if isRegularFile(ui.SignalNeedsApproval) {
 		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
-		if data, readErr := os.ReadFile(ui.SignalNeedsApproval); readErr == nil {
-			content := strings.TrimSpace(string(data))
-			if content != "" {
-				fmt.Println(content)
+		if content, err := readCapped(ui.SignalNeedsApproval, maxApprovalFileSize); err == nil {
+			trimmed := strings.TrimSpace(content)
+			if trimmed != "" {
+				fmt.Println(trimmed)
 			} else {
 				fmt.Println("  (no details provided)")
 			}
 		} else {
-			fmt.Printf("  (could not read details: %v)\n", readErr)
+			fmt.Printf("  (could not read details: %v)\n", err)
 		}
 		return true
 	}
 	return false
+}
+
+// readCapped reads up to maxBytes from a file, appending a truncation notice if needed.
+func readCapped(path string, maxBytes int64) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) > maxBytes {
+		return string(data[:maxBytes]) + "\n  ... (truncated)", nil
+	}
+	return string(data), nil
 }

@@ -187,6 +187,36 @@ func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 	}
 }
 
+func TestCheckSignalFilesDirectoryIgnored(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// A directory named .brr-complete should NOT be treated as a signal file
+	if err := os.Mkdir(ui.SignalComplete, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if checkSignalFiles() {
+		t.Error("expected false when .brr-complete is a directory, not a regular file")
+	}
+}
+
+func TestCheckSignalFilesSymlinkIgnored(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// A symlink named .brr-complete should NOT be treated as a signal file
+	target := filepath.Join(t.TempDir(), "target")
+	if err := os.WriteFile(target, []byte("done"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ui.SignalComplete); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	if checkSignalFiles() {
+		t.Error("expected false when .brr-complete is a symlink, not a regular file")
+	}
+}
+
 func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
 	t.Chdir(t.TempDir())
 
@@ -202,6 +232,41 @@ func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
 
 	if !checkSignalFiles() {
 		t.Error("expected true when .brr-needs-approval exists but is unreadable")
+	}
+}
+
+func TestReadCappedSmallFile(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile("small.txt", []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	content, err := readCapped("small.txt", 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content != "hello" {
+		t.Errorf("expected 'hello', got %q", content)
+	}
+}
+
+func TestReadCappedLargeFile(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Create a file larger than the cap
+	big := strings.Repeat("x", 5000)
+	if err := os.WriteFile("big.txt", []byte(big), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	content, err := readCapped("big.txt", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(content) > 200 { // 100 + truncation notice
+		t.Errorf("expected capped content, got %d bytes", len(content))
+	}
+	if !strings.Contains(content, "truncated") {
+		t.Error("expected truncation notice")
 	}
 }
 

@@ -5,6 +5,7 @@ package engine
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"syscall"
 )
@@ -31,8 +32,9 @@ func killGroup(cmd *exec.Cmd, sig syscall.Signal) error {
 		// os.Interrupt sends CTRL_BREAK_EVENT to the child's process group
 		return cmd.Process.Signal(os.Interrupt)
 	default:
-		// Kill the entire process tree
-		kill := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid))
+		// Kill the entire process tree using absolute path to avoid PATH issues
+		taskkill := filepath.Join(os.Getenv("SystemRoot"), "System32", "taskkill.exe")
+		kill := exec.Command(taskkill, "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid))
 		if err := kill.Run(); err != nil {
 			// Fallback: kill just the direct process
 			return cmd.Process.Kill()

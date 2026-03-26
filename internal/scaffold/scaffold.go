@@ -30,9 +30,10 @@ func Init(force bool) error {
 		existingYAML, _ = os.ReadFile(".brr.yaml")
 	}
 
-	// Track whether we created the prompts dir (for rollback)
+	// Track whether prompts dir existed before we started (for rollback)
 	promptDir := filepath.Join(".brr", "prompts")
-	_, promptDirExisted := os.Stat(promptDir)
+	_, promptDirStatErr := os.Stat(promptDir)
+	promptDirIsNew := promptDirStatErr != nil
 
 	// Stage 1: write .brr.yaml
 	if err := writeBrrYAML(); err != nil {
@@ -50,7 +51,7 @@ func Init(force bool) error {
 	if err != nil {
 		restoreFile(".brr.yaml", existingYAML, yamlExists)
 		// Remove .brr/prompts/ only if we created it
-		if promptDirExisted != nil {
+		if promptDirIsNew {
 			_ = os.Remove(promptDir)
 		}
 		return fmt.Errorf("updating .gitignore: %w", err)

@@ -34,6 +34,30 @@ func TestResolvePromptFromFile(t *testing.T) {
 	}
 }
 
+func TestResolvePromptDirectoryFallsThrough(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Create a directory named "plan" AND a named prompt .brr/prompts/plan.md
+	if err := os.Mkdir("plan", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(".brr", "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(".brr", "prompts", "plan.md"), []byte("named prompt"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should skip the directory and resolve the named prompt
+	text, err := resolvePrompt("plan")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if text != "named prompt" {
+		t.Errorf("expected named prompt, got %q", text)
+	}
+}
+
 func TestResolvePromptNamedFromProject(t *testing.T) {
 	t.Chdir(t.TempDir())
 
