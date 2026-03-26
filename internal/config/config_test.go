@@ -26,7 +26,9 @@ profiles:
     command: other
     args: [--verbose]
 `
-	os.WriteFile(".brr.yaml", []byte(yaml), 0o644)
+	if err := os.WriteFile(".brr.yaml", []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := Load()
 	if err != nil {
@@ -52,7 +54,9 @@ profiles:
 func TestLoadNoProfiles(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	os.WriteFile(".brr.yaml", []byte("default: x\n"), 0o644)
+	if err := os.WriteFile(".brr.yaml", []byte("default: x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load()
 	if err == nil {
@@ -68,11 +72,32 @@ func TestLoadNoDefault(t *testing.T) {
     command: claude
     args: [-p]
 `
-	os.WriteFile(".brr.yaml", []byte(yaml), 0o644)
+	if err := os.WriteFile(".brr.yaml", []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load()
 	if err == nil {
 		t.Error("expected error when no default set")
+	}
+}
+
+func TestLoadDefaultProfileNotFound(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	yaml := `default: nonexistent
+profiles:
+  claude:
+    command: claude
+    args: [-p]
+`
+	if err := os.WriteFile(".brr.yaml", []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load()
+	if err == nil {
+		t.Error("expected error when default profile not in profiles map")
 	}
 }
 

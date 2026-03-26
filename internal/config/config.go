@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/spf13/viper"
 )
@@ -32,8 +33,8 @@ func Load() (Config, error) {
 	v.SetConfigType("yaml")
 
 	// Layer 1: user global config
-	if home, err := os.UserHomeDir(); err == nil {
-		globalPath := filepath.Join(home, ".config", "brr", "config.yaml")
+	if configDir, err := os.UserConfigDir(); err == nil {
+		globalPath := filepath.Join(configDir, "brr", "config.yaml")
 		v.SetConfigFile(globalPath)
 		if err := v.MergeInConfig(); err == nil {
 			found = true
@@ -52,7 +53,6 @@ func Load() (Config, error) {
 
 	if !found {
 		return cfg, fmt.Errorf("no config found (looked in .brr.yaml and ~/.config/brr/config.yaml) — run 'brr init'")
-
 	}
 
 	if err := v.Unmarshal(&cfg); err != nil {
@@ -65,6 +65,10 @@ func Load() (Config, error) {
 
 	if cfg.Default == "" {
 		return cfg, fmt.Errorf("no default profile set in config — add 'default: <name>' to .brr.yaml")
+	}
+
+	if _, ok := cfg.Profiles[cfg.Default]; !ok {
+		return cfg, fmt.Errorf("default profile %q not found in profiles", cfg.Default)
 	}
 
 	return cfg, nil
@@ -93,6 +97,7 @@ func (c Config) ResolveProfile(profileName string) ([]string, string, error) {
 		for k := range c.Profiles {
 			available = append(available, k)
 		}
+		sort.Strings(available)
 		return nil, name, fmt.Errorf("profile %q not found (available: %v)", name, available)
 	}
 
