@@ -18,6 +18,9 @@ const maxApprovalFileSize = 4096
 
 const maxFailStreak = 3
 
+// ErrInterrupted is returned when the engine is stopped by a user signal (Ctrl+C).
+var ErrInterrupted = fmt.Errorf("interrupted")
+
 // Options configures a loop run.
 type Options struct {
 	Prompt  string   // resolved prompt text
@@ -126,7 +129,7 @@ func Run(opts Options) error {
 		// Check if user requested stop (first Ctrl+C) between iterations
 		if stopping.Load() {
 			fmt.Printf("\n  %s%sStopped%s.\n", ui.Bold, ui.Yellow, ui.Reset)
-			return nil
+			return ErrInterrupted
 		}
 
 		if stop := checkSignalFiles(); stop {
@@ -170,7 +173,7 @@ func Run(opts Options) error {
 		// If user requested stop (first Ctrl+C), exit gracefully now that the iteration is done
 		if stopping.Load() {
 			fmt.Printf("\n  %s%sStopped after iteration %d%s.\n", ui.Bold, ui.Yellow, iterNum, ui.Reset)
-			return nil
+			return ErrInterrupted
 		}
 
 		if err != nil {

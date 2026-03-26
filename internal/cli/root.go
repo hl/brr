@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const exitCodeSIGINT = 130 // 128 + SIGINT(2)
+
 var rootCmd = &cobra.Command{
 	Use:          "brr <prompt> [flags]",
 	Short:        "Your AI agent, but unhinged",
@@ -61,11 +63,15 @@ func run(cmd *cobra.Command, args []string) error {
 	printBanner()
 	printConfig(args[0], resolvedName, command, max)
 
-	return engine.Run(engine.Options{
+	err = engine.Run(engine.Options{
 		Prompt:  promptText,
 		Max:     max,
 		Command: command,
 	})
+	if errors.Is(err, engine.ErrInterrupted) {
+		cmd.SilenceErrors = true
+	}
+	return err
 }
 
 // resolvePrompt reads a prompt from a file path, .brr/prompts/<name>.md, or returns it as inline text.
@@ -158,6 +164,9 @@ func printConfig(promptName string, profileName string, command []string, max in
 // Execute runs the root command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		if errors.Is(err, engine.ErrInterrupted) {
+			os.Exit(exitCodeSIGINT)
+		}
 		os.Exit(1)
 	}
 }
