@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/hl/brr/internal/ui"
@@ -56,41 +55,52 @@ func Run(opts Options) error {
 	var stopping atomic.Bool
 	var sigCount atomic.Int32
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan struct{})
+	notifySignals(sigCh)
 	defer signal.Stop(sigCh)
 
 	go func() {
-		for range sigCh {
-			n := sigCount.Add(1)
-			switch n {
-			case 1:
-				stopping.Store(true)
-				fmt.Printf("\n  %s%s⏳ Finishing current iteration...%s (Ctrl+C again to interrupt now)\n",
-					ui.Bold, ui.Yellow, ui.Reset)
-			case 2:
-				mu.Lock()
-				cmd := currentCmd
-				mu.Unlock()
-				if cmd != nil && cmd.Process != nil {
-					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
+		for {
+			select {
+			case <-done:
+				return
+			case _, ok := <-sigCh:
+				if !ok {
+					return
 				}
-			default:
-				mu.Lock()
-				cmd := currentCmd
-				mu.Unlock()
-				if cmd != nil && cmd.Process != nil {
-					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				n := sigCount.Add(1)
+				switch n {
+				case 1:
+					stopping.Store(true)
+					fmt.Printf("\n  %s%s⏳ Finishing current iteration...%s (Ctrl+C again to interrupt now)\n",
+						ui.Bold, ui.Yellow, ui.Reset)
+				case 2:
+					mu.Lock()
+					cmd := currentCmd
+					mu.Unlock()
+					if cmd != nil && cmd.Process != nil {
+						_ = killGroup(cmd, sigINT)
+					}
+				default:
+					mu.Lock()
+					cmd := currentCmd
+					mu.Unlock()
+					if cmd != nil && cmd.Process != nil {
+						_ = killGroup(cmd, sigKILL)
+					}
 				}
 			}
 		}
 	}()
+	defer close(done)
 
 	failStreak := 0
 	i := 0
 
 	for opts.Max == 0 || i < opts.Max {
-		if stopping.Load() && sigCount.Load() >= 2 {
-			fmt.Printf("\n  %s%sInterrupted%s. Stopping.\n", ui.Bold, ui.Yellow, ui.Reset)
+		// Check if user requested stop (first Ctrl+C) between iterations
+		if stopping.Load() {
+			fmt.Printf("\n  %s%sStopped%s.\n", ui.Bold, ui.Yellow, ui.Reset)
 			return nil
 		}
 
@@ -111,12 +121,11 @@ func Run(opts Options) error {
 		)
 
 		// Run the command with prompt piped to stdin.
-		// Use a process group so signals can target the entire child tree.
 		cmd := exec.Command(opts.Command[0], opts.Command[1:]...)
 		cmd.Stdin = strings.NewReader(opts.Prompt)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		setProcAttr(cmd)
 
 		mu.Lock()
 		currentCmd = cmd
