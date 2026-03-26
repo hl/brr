@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hl/brr/internal/config"
@@ -13,16 +14,22 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "brr <prompt> [flags]",
-	Short: "Your AI agent, but unhinged",
-	Long:  "brr runs a prompt in a loop, spinning up a fresh session for each iteration.",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  run,
+	Use:          "brr <prompt> [flags]",
+	Short:        "Your AI agent, but unhinged",
+	Long:         "brr runs a prompt in a loop, spinning up a fresh session for each iteration.",
+	Args:         cobra.ExactArgs(1),
+	RunE:         run,
+	SilenceUsage: true,
 }
 
 func init() {
 	rootCmd.Flags().IntP("max", "m", 0, "max iterations (0 = unlimited)")
 	rootCmd.Flags().StringP("profile", "p", "", "agent profile from .brr.yaml (uses 'default' if omitted)")
+}
+
+// SetVersion configures the version string shown by --version.
+func SetVersion(version, commit string) {
+	rootCmd.Version = fmt.Sprintf("%s (%s)", version, commit)
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -45,6 +52,10 @@ func run(cmd *cobra.Command, args []string) error {
 	promptText, err := resolvePrompt(args[0])
 	if err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(promptText) == "" {
+		return fmt.Errorf("prompt is empty")
 	}
 
 	printBanner()
@@ -75,17 +86,22 @@ func resolvePrompt(nameOrPath string) (string, error) {
 	if !strings.Contains(nameOrPath, " ") {
 		name := strings.TrimSuffix(nameOrPath, ".md")
 
+		// Reject path traversal attempts
+		if strings.Contains(name, "..") {
+			return "", fmt.Errorf("invalid prompt name: %q", name)
+		}
+
 		// Try .brr/prompts/<name>.md
-		projectPath := fmt.Sprintf(".brr/prompts/%s.md", name)
+		projectPath := filepath.Join(".brr", "prompts", name+".md")
 		if data, err := os.ReadFile(projectPath); !errors.Is(err, os.ErrNotExist) && err != nil {
 			return "", fmt.Errorf("reading %s: %w", projectPath, err)
 		} else if err == nil {
 			return string(data), nil
 		}
 
-		// Try ~/.config/brr/prompts/<name>.md
-		if home, err := os.UserHomeDir(); err == nil {
-			userPath := fmt.Sprintf("%s/.config/brr/prompts/%s.md", home, name)
+		// Try user config dir prompts/<name>.md
+		if configDir, err := os.UserConfigDir(); err == nil {
+			userPath := filepath.Join(configDir, "brr", "prompts", name+".md")
 			if data, err := os.ReadFile(userPath); !errors.Is(err, os.ErrNotExist) && err != nil {
 				return "", fmt.Errorf("reading %s: %w", userPath, err)
 			} else if err == nil {
@@ -98,9 +114,18 @@ func resolvePrompt(nameOrPath string) (string, error) {
 	return nameOrPath, nil
 }
 
-// looksLikeFilePath returns true if s looks like a file path (has extension or path separator).
+// looksLikeFilePath returns true if s looks like a file path (has path separator
+// or a recognized prompt file extension).
 func looksLikeFilePath(s string) bool {
-	return strings.ContainsRune(s, os.PathSeparator) || strings.Contains(s, ".")
+	if strings.ContainsRune(s, os.PathSeparator) {
+		return true
+	}
+	ext := filepath.Ext(s)
+	switch ext {
+	case ".md", ".txt", ".prompt":
+		return true
+	}
+	return false
 }
 
 func printBanner() {
