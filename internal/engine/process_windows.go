@@ -21,22 +21,32 @@ func setProcAttr(cmd *exec.Cmd) {
 }
 
 // killGroup sends a termination signal to the child process tree on Windows.
-// For SIGINT: sends CTRL_BREAK_EVENT via os.Interrupt to the child's process group.
-// For SIGKILL: uses taskkill /T /F to terminate the entire process tree.
+// For SIGINT: attempts graceful tree kill via taskkill, then falls back to Process.Kill.
+// For SIGKILL/SIGTERM: uses taskkill /T /F to force-terminate the entire process tree.
 func killGroup(cmd *exec.Cmd, sig syscall.Signal) error {
 	if cmd.Process == nil {
 		return nil
 	}
+	pid := strconv.Itoa(cmd.Process.Pid)
+	var taskkill string
+	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
+		taskkill = filepath.Join(systemRoot, "System32", "taskkill.exe")
+	} else {
+		taskkill = "taskkill.exe"
+	}
+
 	switch sig {
 	case syscall.SIGINT:
-		// os.Interrupt sends CTRL_BREAK_EVENT to the child's process group
-		return cmd.Process.Signal(os.Interrupt)
-	default:
-		// Kill the entire process tree using absolute path to avoid PATH issues
-		taskkill := filepath.Join(os.Getenv("SystemRoot"), "System32", "taskkill.exe")
-		kill := exec.Command(taskkill, "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid))
+		// Graceful tree kill (no /F) — gives the child a chance to clean up
+		kill := exec.Command(taskkill, "/T", "/PID", pid)
 		if err := kill.Run(); err != nil {
-			// Fallback: kill just the direct process
+			return cmd.Process.Kill()
+		}
+		return nil
+	default:
+		// Force kill the entire process tree
+		kill := exec.Command(taskkill, "/T", "/F", "/PID", pid)
+		if err := kill.Run(); err != nil {
 			return cmd.Process.Kill()
 		}
 		return nil

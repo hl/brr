@@ -9,6 +9,7 @@ import (
 
 	"github.com/hl/brr/internal/config"
 	"github.com/hl/brr/internal/engine"
+	"github.com/hl/brr/internal/fsutil"
 	"github.com/hl/brr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -101,19 +102,19 @@ func resolvePrompt(nameOrPath string) (string, error) {
 
 		// Try .brr/prompts/<name>.md
 		projectPath := filepath.Join(".brr", "prompts", name+".md")
-		if data, err := os.ReadFile(projectPath); !errors.Is(err, os.ErrNotExist) && err != nil {
-			return "", fmt.Errorf("reading %s: %w", projectPath, err)
-		} else if err == nil {
+		if data, err := fsutil.ReadRegularFile(projectPath); err == nil {
 			return string(data), nil
+		} else if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, fsutil.ErrNotRegularFile) {
+			return "", fmt.Errorf("reading %s: %w", projectPath, err)
 		}
 
 		// Try user config dir prompts/<name>.md
 		if configDir, err := os.UserConfigDir(); err == nil {
 			userPath := filepath.Join(configDir, "brr", "prompts", name+".md")
-			if data, err := os.ReadFile(userPath); !errors.Is(err, os.ErrNotExist) && err != nil {
-				return "", fmt.Errorf("reading %s: %w", userPath, err)
-			} else if err == nil {
+			if data, err := fsutil.ReadRegularFile(userPath); err == nil {
 				return string(data), nil
+			} else if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, fsutil.ErrNotRegularFile) {
+				return "", fmt.Errorf("reading %s: %w", userPath, err)
 			}
 		}
 	}
@@ -122,15 +123,21 @@ func resolvePrompt(nameOrPath string) (string, error) {
 	return nameOrPath, nil
 }
 
-// looksLikeFilePath returns true if s looks like a file path rather than inline
-// prompt text. A string with spaces is always treated as inline text. Otherwise,
-// it's a file path if it has a recognized prompt extension.
+// looksLikeFilePath returns true if s looks like a file path rather than inline prompt text.
 func looksLikeFilePath(s string) bool {
-	// Inline text (contains spaces) is never a file path
+	hasSep := strings.ContainsRune(s, filepath.Separator) || strings.ContainsRune(s, '/')
+	hasPromptExt := isPromptExtension(filepath.Ext(s))
+
 	if strings.Contains(s, " ") {
-		return false
+		// With spaces: only a file path if it has BOTH a separator and a recognized extension
+		// e.g. "docs/Build Plan.md" → file path; "Fix stuff in src/" → inline text
+		return hasSep && hasPromptExt
 	}
-	ext := filepath.Ext(s)
+	// Without spaces: separator alone or recognized extension alone → file path
+	return hasSep || hasPromptExt
+}
+
+func isPromptExtension(ext string) bool {
 	switch ext {
 	case ".md", ".txt", ".prompt":
 		return true

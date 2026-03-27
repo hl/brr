@@ -10,7 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
+	"github.com/hl/brr/internal/fsutil"
 	"github.com/hl/brr/internal/ui"
 )
 
@@ -155,11 +157,31 @@ func Run(opts Options) error {
 		cmd.Stderr = os.Stderr
 		setProcAttr(cmd)
 
+		// Start then publish: ensures cmd.Process is populated before the signal
+		// handler can see currentCmd, preventing races where signals arrive between
+		// setting currentCmd and the process actually existing.
+		if err := cmd.Start(); err != nil {
+			mu.Lock()
+			currentCmd = nil
+			mu.Unlock()
+			// Start failure counts as iteration failure
+			failStreak++
+			fmt.Printf("  %s%s✗ Iteration %d failed to start%s: %v. Consecutive failures: %d/%d\n",
+				ui.Bold, ui.Red, iterNum, ui.Reset, err, failStreak, maxFailStreak,
+			)
+			if failStreak >= maxFailStreak {
+				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
+				return fmt.Errorf("stopped after %d consecutive failures", maxFailStreak)
+			}
+			i++
+			continue
+		}
+
 		mu.Lock()
 		currentCmd = cmd
 		mu.Unlock()
 
-		err := cmd.Run()
+		err := cmd.Wait()
 
 		mu.Lock()
 		currentCmd = nil
@@ -200,26 +222,20 @@ func Run(opts Options) error {
 	return nil
 }
 
-// isRegularFile returns true if path exists and is a regular file (not a symlink, dir, etc.).
-func isRegularFile(path string) bool {
-	fi, err := os.Lstat(path)
-	if err != nil {
-		return false
-	}
-	return fi.Mode().IsRegular()
-}
-
 // checkSignalFiles checks for .brr-complete and .brr-needs-approval.
 // Only regular files are treated as signals (symlinks and directories are ignored).
 // Returns true if the engine should stop.
 func checkSignalFiles() bool {
-	if isRegularFile(ui.SignalComplete) {
+	if fsutil.IsRegularFile(ui.SignalComplete) {
 		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, ui.SignalComplete)
 		return true
 	}
-	if isRegularFile(ui.SignalNeedsApproval) {
+	// Try to open and read in one pass; fall back to existence check for unreadable files
+	if f, err := fsutil.OpenRegularFile(ui.SignalNeedsApproval); err == nil {
 		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
-		if content, err := readCapped(ui.SignalNeedsApproval, maxApprovalFileSize); err == nil {
+		content, readErr := readCappedFromFile(f, maxApprovalFileSize)
+		_ = f.Close()
+		if readErr == nil {
 			trimmed := strings.TrimSpace(content)
 			if trimmed != "" {
 				fmt.Println(trimmed)
@@ -227,26 +243,32 @@ func checkSignalFiles() bool {
 				fmt.Println("  (no details provided)")
 			}
 		} else {
-			fmt.Printf("  (could not read details: %v)\n", err)
+			fmt.Printf("  (could not read details: %v)\n", readErr)
 		}
+		return true
+	} else if fsutil.IsRegularFile(ui.SignalNeedsApproval) {
+		// File exists but can't be opened (e.g. permissions) — still honor the signal
+		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
+		fmt.Printf("  (could not read details: %v)\n", err)
 		return true
 	}
 	return false
 }
 
-// readCapped reads up to maxBytes from a file, appending a truncation notice if needed.
-func readCapped(path string, maxBytes int64) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = f.Close() }()
+// readCappedFromFile reads up to maxBytes from an already-open file, appending a truncation notice if needed.
+// Truncation is aligned to a valid UTF-8 boundary to avoid garbled output.
+func readCappedFromFile(f *os.File, maxBytes int64) (string, error) {
 	data, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
 	if err != nil {
 		return "", err
 	}
 	if int64(len(data)) > maxBytes {
-		return string(data[:maxBytes]) + "\n  ... (truncated)", nil
+		// Walk backwards to a UTF-8 rune boundary (at most 3 bytes back)
+		cut := int(maxBytes)
+		for cut > 0 && !utf8.RuneStart(data[cut]) {
+			cut--
+		}
+		return string(data[:cut]) + "\n  ... (truncated)", nil
 	}
 	return string(data), nil
 }

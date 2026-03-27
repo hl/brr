@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,17 +18,23 @@ func Init(force bool) error {
 	}
 
 	// Check if .brr.yaml exists using Lstat (works even for write-only files)
-	_, lstatErr := os.Lstat(".brr.yaml")
+	yamlInfo, lstatErr := os.Lstat(".brr.yaml")
 	yamlExists := lstatErr == nil
 
 	if yamlExists && !force {
 		return fmt.Errorf(".brr.yaml already exists (use --force to overwrite)")
 	}
 
-	// Best-effort backup for rollback (may fail for write-only files, that's OK)
+	// Backup for rollback — abort if file exists but can't be read (can't guarantee restore)
 	var existingYAML []byte
+	var existingMode os.FileMode
 	if yamlExists {
-		existingYAML, _ = os.ReadFile(".brr.yaml")
+		data, err := os.ReadFile(".brr.yaml")
+		if err != nil {
+			return fmt.Errorf("cannot back up .brr.yaml for rollback: %w", err)
+		}
+		existingYAML = data
+		existingMode = yamlInfo.Mode().Perm()
 	}
 
 	// Track whether prompts dir existed before we started (for rollback)
@@ -35,21 +42,31 @@ func Init(force bool) error {
 	_, promptDirStatErr := os.Stat(promptDir)
 	promptDirIsNew := promptDirStatErr != nil
 
-	// Stage 1: write .brr.yaml
+	// Stage 1: write .brr.yaml (re-verify no symlink swap before writing)
+	if err := rejectSymlink(".brr.yaml"); err != nil {
+		return err
+	}
 	if err := writeBrrYAML(); err != nil {
 		return err
 	}
 
 	// Stage 2: create .brr/prompts/
 	if err := os.MkdirAll(promptDir, 0o755); err != nil {
-		restoreFile(".brr.yaml", existingYAML, yamlExists)
+		restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists)
 		return err
 	}
 
-	// Stage 3: update .gitignore
+	// Stage 3: update .gitignore (re-verify no symlink swap)
+	if err := rejectSymlink(".gitignore"); err != nil {
+		restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists)
+		if promptDirIsNew {
+			_ = os.Remove(promptDir)
+		}
+		return err
+	}
 	gitignoreUpdated, err := updateGitignore()
 	if err != nil {
-		restoreFile(".brr.yaml", existingYAML, yamlExists)
+		restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists)
 		// Remove .brr/prompts/ only if we created it
 		if promptDirIsNew {
 			_ = os.Remove(promptDir)
@@ -89,11 +106,11 @@ func rejectSymlink(path string) error {
 	return nil
 }
 
-// restoreFile restores a file to its previous state.
-func restoreFile(path string, data []byte, existed bool) {
-	if existed && data != nil {
-		_ = os.WriteFile(path, data, 0o644)
-	} else if !existed {
+// restoreFile restores a file to its previous state, preserving the original permissions.
+func restoreFile(path string, data []byte, mode os.FileMode, existed bool) {
+	if existed {
+		_ = os.WriteFile(path, data, mode)
+	} else {
 		_ = os.Remove(path)
 	}
 }
@@ -149,11 +166,8 @@ func updateGitignore() (bool, error) {
 	}
 	_, writeErr := f.WriteString(buf.String())
 	closeErr := f.Close()
-	if writeErr != nil {
-		return false, writeErr
-	}
-	if closeErr != nil {
-		return false, closeErr
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		return false, err
 	}
 
 	return true, nil
@@ -180,5 +194,33 @@ profiles:
     command: codex
     args: [exec, --ephemeral, --dangerously-bypass-approvals-and-sandbox, --model, gpt-5.4, -]
 `
-	return os.WriteFile(".brr.yaml", []byte(content), 0o644)
+	return atomicWriteFile(".brr.yaml", []byte(content), 0o644)
+}
+
+// atomicWriteFile writes data to a temp file then renames it to path,
+// preventing TOCTOU races where a symlink is swapped in between check and write.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".brr-tmp-*")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		// Clean up temp file on any failure path
+		_ = os.Remove(tmpName)
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }

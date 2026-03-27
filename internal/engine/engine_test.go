@@ -241,7 +241,12 @@ func TestReadCappedSmallFile(t *testing.T) {
 	if err := os.WriteFile("small.txt", []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	content, err := readCapped("small.txt", 4096)
+	f, err := os.Open("small.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	content, err := readCappedFromFile(f, 4096)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +263,12 @@ func TestReadCappedLargeFile(t *testing.T) {
 	if err := os.WriteFile("big.txt", []byte(big), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	content, err := readCapped("big.txt", 100)
+	f, err := os.Open("big.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	content, err := readCappedFromFile(f, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,6 +277,41 @@ func TestReadCappedLargeFile(t *testing.T) {
 	}
 	if !strings.Contains(content, "truncated") {
 		t.Error("expected truncation notice")
+	}
+}
+
+func TestReadCappedUTF8Boundary(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Write a file with multi-byte UTF-8 characters (each emoji is 4 bytes)
+	// Cut at a byte boundary that falls mid-codepoint
+	emoji := "🔥🔥🔥🔥🔥" // 5 emojis × 4 bytes = 20 bytes
+	if err := os.WriteFile("utf8.txt", []byte(emoji), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open("utf8.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	// Cap at 6 bytes — falls mid-codepoint (second emoji starts at byte 4, ends at 8)
+	content, err := readCappedFromFile(f, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(content, "truncated") {
+		t.Error("expected truncation notice")
+	}
+	// The truncated content (before the notice) must be valid UTF-8
+	idx := strings.Index(content, "\n  ... (truncated)")
+	if idx < 0 {
+		t.Fatal("truncation notice not found")
+	}
+	prefix := content[:idx]
+	// Should have backed up to byte 4 (one full emoji)
+	if prefix != "🔥" {
+		t.Errorf("expected one full emoji before truncation, got %q", prefix)
 	}
 }
 

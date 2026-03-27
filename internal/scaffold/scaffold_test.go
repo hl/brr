@@ -204,6 +204,23 @@ func TestInitWriteOnlyYAMLRequiresForce(t *testing.T) {
 	}
 }
 
+func TestInitForceWriteOnlyAborts(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Write-only file can't be backed up — Init should abort even with --force
+	if err := os.WriteFile(".brr.yaml", []byte("existing"), 0o200); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Init(true)
+	if err == nil {
+		t.Error("expected error when write-only .brr.yaml can't be backed up")
+	}
+	if err != nil && !strings.Contains(err.Error(), "cannot back up") {
+		t.Errorf("expected backup error, got: %v", err)
+	}
+}
+
 func TestInitGitignoreCommentedEntriesNotMatched(t *testing.T) {
 	t.Chdir(t.TempDir())
 
