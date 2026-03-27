@@ -98,7 +98,9 @@ func Run(opts Options) error {
 					cmd := currentCmd
 					mu.Unlock()
 					if cmd != nil && cmd.Process != nil {
-						_ = killGroup(cmd, sigTERM)
+						if err := killGroup(cmd, sigTERM); err != nil {
+							fmt.Fprintf(os.Stderr, "warning: failed to forward SIGTERM to child: %v\n", err)
+						}
 					}
 					fmt.Printf("\n  %s%s⏳ SIGTERM received, forwarding to child...%s\n",
 						ui.Bold, ui.Yellow, ui.Reset)
@@ -116,14 +118,18 @@ func Run(opts Options) error {
 					cmd := currentCmd
 					mu.Unlock()
 					if cmd != nil && cmd.Process != nil {
-						_ = killGroup(cmd, sigINT)
+						if err := killGroup(cmd, sigINT); err != nil {
+							fmt.Fprintf(os.Stderr, "warning: failed to interrupt child: %v\n", err)
+						}
 					}
 				default:
 					mu.Lock()
 					cmd := currentCmd
 					mu.Unlock()
 					if cmd != nil && cmd.Process != nil {
-						_ = killGroup(cmd, sigKILL)
+						if err := killGroup(cmd, sigKILL); err != nil {
+							fmt.Fprintf(os.Stderr, "warning: failed to force-kill child: %v\n", err)
+						}
 					}
 				}
 			}
