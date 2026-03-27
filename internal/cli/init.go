@@ -21,7 +21,10 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	force, _ := cmd.Flags().GetBool("force")
+	force, err := cmd.Flags().GetBool("force")
+	if err != nil {
+		return fmt.Errorf("reading --force flag: %w", err)
+	}
 
 	fmt.Println()
 	return scaffold.Init(force)

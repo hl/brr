@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt vet check clean cross-build release-check release-snapshot
+.PHONY: build test lint fmt fmt-fix vet check clean cross-build release-check release-snapshot
 
 # Build the brr binary
 build:

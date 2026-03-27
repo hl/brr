@@ -64,11 +64,11 @@ func Load() (Config, error) {
 	}
 
 	if len(cfg.Profiles) == 0 {
-		return cfg, fmt.Errorf("no profiles defined in config — add at least one profile to .brr.yaml")
+		return cfg, fmt.Errorf("no profiles defined in config — add at least one profile to your config file")
 	}
 
 	if cfg.Default == "" {
-		return cfg, fmt.Errorf("no default profile set in config — add 'default: <name>' to .brr.yaml")
+		return cfg, fmt.Errorf("no default profile set in config — add 'default: <name>' to your config file")
 	}
 
 	if _, ok := cfg.Profiles[cfg.Default]; !ok {

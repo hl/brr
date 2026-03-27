@@ -78,7 +78,7 @@ func TestInitGitignoreAppendsToExisting(t *testing.T) {
 func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n"), 0o644); err != nil {
+	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n.brr.lock\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

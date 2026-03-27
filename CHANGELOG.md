@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Lockfile (`.brr.lock`) to prevent concurrent runs from racing on signal files
+- CI workflow for push/PR quality gates
+
+### Fixed
+
+- `resolvePrompt` now distinguishes permission errors from "file not found" instead of misreporting all stat failures
+- Fail-streak error now includes the underlying cause (last child error) instead of a generic message
+- Scaffold `Init` correctly identifies permission errors vs missing directories during rollback
+- Config validation errors no longer hardcode `.brr.yaml` when the config may come from the global path
+- Cobra flag getter errors are now checked and returned
+- Pinned golangci-lint to v2.11.4 in CI for reproducible builds
+
+### Changed
+
+- `brr init` now adds `.brr.lock` to `.gitignore`
+
 ## [0.1.1] "Helpful Graffiti" - 2026-03-27
 
 ### Added

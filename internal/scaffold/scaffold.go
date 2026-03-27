@@ -40,7 +40,7 @@ func Init(force bool) error {
 	// Track whether prompts dir existed before we started (for rollback)
 	promptDir := filepath.Join(".brr", "prompts")
 	_, promptDirStatErr := os.Stat(promptDir)
-	promptDirIsNew := promptDirStatErr != nil
+	promptDirIsNew := os.IsNotExist(promptDirStatErr)
 
 	// Stage 1: write .brr.yaml (re-verify no symlink swap before writing)
 	if err := rejectSymlink(".brr.yaml"); err != nil {
@@ -119,6 +119,7 @@ func restoreFile(path string, data []byte, mode os.FileMode, existed bool) {
 var gitignoreEntries = []string{
 	".brr-complete",
 	".brr-needs-approval",
+	".brr.lock",
 }
 
 // updateGitignore appends missing brr entries to .gitignore.

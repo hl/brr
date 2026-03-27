@@ -52,11 +52,12 @@ func TestRunFailStreak(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// "false" always exits 1 on Unix
+	counter := filepath.Join(".", "fail-counter")
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "exit", "1"}
+		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & exit 1"}
 	} else {
-		cmd = []string{"false"}
+		cmd = []string{"sh", "-c", "echo x >> " + counter + " && exit 1"}
 	}
 
 	err := Run(Options{
@@ -65,7 +66,20 @@ func TestRunFailStreak(t *testing.T) {
 		Command: cmd,
 	})
 	if err == nil {
-		t.Error("expected error after consecutive failures")
+		t.Fatal("expected error after consecutive failures")
+	}
+	if !strings.Contains(err.Error(), "stopped after 3 consecutive failures") {
+		t.Errorf("expected fail-streak error message, got: %v", err)
+	}
+
+	// Verify exactly maxFailStreak iterations ran
+	data, readErr := os.ReadFile(counter)
+	if readErr != nil {
+		t.Fatal("counter file not created")
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != maxFailStreak {
+		t.Errorf("expected %d iterations, got %d", maxFailStreak, len(lines))
 	}
 }
 
@@ -135,14 +149,15 @@ func TestRunSignalFileNeedsApproval(t *testing.T) {
 func TestRunSignalFileCreatedByChild(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// Child creates the signal file — engine should detect after child exits
+	// Child creates the signal file AND a counter — engine should stop after one iteration
 	signalPath := filepath.Join(".", ui.SignalComplete)
+	counter := filepath.Join(".", "iter-counter")
 
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "echo", "done", ">", signalPath}
+		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & echo done > " + signalPath}
 	} else {
-		cmd = []string{"sh", "-c", "touch " + signalPath}
+		cmd = []string{"sh", "-c", "echo x >> " + counter + " && touch " + signalPath}
 	}
 
 	err := Run(Options{
@@ -152,6 +167,16 @@ func TestRunSignalFileCreatedByChild(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify only one iteration ran (engine stopped after detecting signal file)
+	data, readErr := os.ReadFile(counter)
+	if readErr != nil {
+		t.Fatal("counter file not created")
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 iteration before signal file stopped the loop, got %d", len(lines))
 	}
 }
 

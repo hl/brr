@@ -36,6 +36,13 @@ func Run(opts Options) error {
 		return fmt.Errorf("no command configured — set 'command' in .brr.yaml")
 	}
 
+	// Prevent concurrent brr runs in the same directory
+	lf, err := acquireLock()
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lf)
+
 	// If signal files exist from a previous run, respect them immediately
 	if stop := checkSignalFiles(); stop {
 		// Clean up the signal files so they don't block subsequent runs
@@ -125,6 +132,7 @@ func Run(opts Options) error {
 	defer close(done)
 
 	failStreak := 0
+	var lastErr error
 	i := 0
 
 	for opts.Max == 0 || i < opts.Max {
@@ -166,12 +174,13 @@ func Run(opts Options) error {
 			mu.Unlock()
 			// Start failure counts as iteration failure
 			failStreak++
+			lastErr = err
 			fmt.Printf("  %s%s✗ Iteration %d failed to start%s: %v. Consecutive failures: %d/%d\n",
 				ui.Bold, ui.Red, iterNum, ui.Reset, err, failStreak, maxFailStreak,
 			)
 			if failStreak >= maxFailStreak {
 				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
-				return fmt.Errorf("stopped after %d consecutive failures", maxFailStreak)
+				return fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
 			}
 			i++
 			continue
@@ -200,6 +209,7 @@ func Run(opts Options) error {
 
 		if err != nil {
 			failStreak++
+			lastErr = err
 			rc := 1
 			if exitErr, ok := err.(*exec.ExitError); ok {
 				rc = exitErr.ExitCode()
@@ -209,7 +219,7 @@ func Run(opts Options) error {
 			)
 			if failStreak >= maxFailStreak {
 				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
-				return fmt.Errorf("stopped after %d consecutive failures", maxFailStreak)
+				return fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
 			}
 		} else {
 			failStreak = 0

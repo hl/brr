@@ -45,7 +45,10 @@ func SetVersion(version, commit string) {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	max, _ := cmd.Flags().GetInt("max")
+	max, err := cmd.Flags().GetInt("max")
+	if err != nil {
+		return fmt.Errorf("reading --max flag: %w", err)
+	}
 	if max < 0 {
 		return fmt.Errorf("--max must be >= 0, got %d", max)
 	}
@@ -55,7 +58,10 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	profileName, _ := cmd.Flags().GetString("profile")
+	profileName, err := cmd.Flags().GetString("profile")
+	if err != nil {
+		return fmt.Errorf("reading --profile flag: %w", err)
+	}
 	command, resolvedName, err := cfg.ResolveProfile(profileName)
 	if err != nil {
 		return err
@@ -96,8 +102,11 @@ func resolvePrompt(nameOrPath string) (string, error) {
 			return "", fmt.Errorf("reading prompt file: %w", err)
 		}
 	} else if looksLikeFilePath(nameOrPath) {
-		// It looks like a file path but doesn't exist — that's an error, not inline text
-		return "", fmt.Errorf("prompt file not found: %s", nameOrPath)
+		// It looks like a file path — distinguish "not found" from other stat errors
+		if os.IsNotExist(statErr) {
+			return "", fmt.Errorf("prompt file not found: %s", nameOrPath)
+		}
+		return "", fmt.Errorf("accessing prompt file %s: %w", nameOrPath, statErr)
 	}
 
 	// For bare names (no spaces), try named prompt resolution
