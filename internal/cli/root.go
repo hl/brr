@@ -28,6 +28,15 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().IntP("max", "m", 0, "max iterations (0 = unlimited)")
 	rootCmd.Flags().StringP("profile", "p", "", "agent profile from .brr.yaml (uses 'default' if omitted)")
+
+	defaultHelp := rootCmd.HelpFunc()
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if !cmd.HasParent() {
+			printBanner()
+			fmt.Printf("  %shttps://github.com/hl/brr%s\n\n", ui.Dim, ui.Reset)
+		}
+		defaultHelp(cmd, args)
+	})
 }
 
 // SetVersion configures the version string shown by --version.
