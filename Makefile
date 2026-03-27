@@ -1,12 +1,12 @@
-.PHONY: build test lint fmt vet check clean cross-build
+.PHONY: build test lint fmt vet check clean cross-build release-check release-snapshot
 
 # Build the brr binary
 build:
 	mise exec -- go build -o brr ./cmd/brr
 
-# Run all tests
+# Run all tests with race detector
 test:
-	mise exec -- go test ./...
+	mise exec -- go test -race ./...
 
 # Run linter
 lint:
@@ -24,12 +24,12 @@ fmt-fix:
 vet:
 	mise exec -- go vet ./...
 
-# Cross-compile for all release targets (matches .goreleaser.yaml)
+# Cross-compile for all release targets (mirrors .goreleaser.yaml: CGO_ENABLED=0)
 cross-build:
 	@for os in linux darwin windows; do \
 		for arch in amd64 arm64; do \
 			echo "  building $$os/$$arch..."; \
-			GOOS=$$os GOARCH=$$arch mise exec -- go build ./... || exit 1; \
+			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch mise exec -- go build ./... || exit 1; \
 		done; \
 	done
 	@echo "  all targets OK"
@@ -40,3 +40,11 @@ check: fmt vet lint test build cross-build
 # Clean build artifacts
 clean:
 	rm -f brr
+
+# Validate goreleaser config
+release-check:
+	mise exec -- goreleaser check
+
+# Build a local snapshot (no publish, no tag required)
+release-snapshot:
+	mise exec -- goreleaser release --snapshot --clean

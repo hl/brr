@@ -9,9 +9,12 @@ Works with any AI coding agent that accepts prompts on stdin — [Claude Code](h
 ## Install
 
 ```bash
-go install github.com/hl/brr/cmd/brr@latest
+brew install hl/tap/brr
 
 # or
+go install github.com/hl/brr/cmd/brr@latest
+
+# or build from source
 git clone https://github.com/hl/brr && cd brr && make build
 ```
 
