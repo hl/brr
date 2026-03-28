@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -21,14 +22,18 @@ func acquireLock() (*os.File, error) {
 	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 	if err != nil {
 		_ = f.Close()
-		return nil, fmt.Errorf("another brr instance is already running in this directory")
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, fmt.Errorf("another brr instance is already running in this directory")
+		}
+		return nil, fmt.Errorf("acquiring lock: %w", err)
 	}
 	return f, nil
 }
 
-// releaseLock releases the lock and removes the lock file.
+// releaseLock releases the advisory lock and closes the file handle.
+// The lock file is intentionally kept on disk to prevent a race where
+// another process acquires the old inode just before it is unlinked.
 func releaseLock(f *os.File) {
 	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 	_ = f.Close()
-	_ = os.Remove(lockFile)
 }

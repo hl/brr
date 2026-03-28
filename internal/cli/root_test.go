@@ -232,6 +232,32 @@ func TestResolvePromptNamedSymlinkRejected(t *testing.T) {
 	}
 }
 
+func TestResolvePromptDirectFileSymlinkRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Create a symlink to a regular file — direct path resolution should reject it
+	target := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(target, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, "prompt-link.md"); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	// Should not read through the symlink — should fall through to inline
+	text, err := resolvePrompt("prompt-link.md")
+	if err != nil {
+		// It's a .md file that exists (as a symlink), so looksLikeFilePath is true
+		// and Lstat succeeds. Since it's not a regular file, it falls through.
+		// But looksLikeFilePath would match, so it errors with "not found" type message.
+		// This is acceptable — symlink .md files get rejected.
+		return
+	}
+	if text == "secret" {
+		t.Error("symlink prompt file should not be read")
+	}
+}
+
 func TestResolvePromptPathWithSeparator(t *testing.T) {
 	t.Chdir(t.TempDir())
 

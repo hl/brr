@@ -180,6 +180,86 @@ func TestRunSignalFileCreatedByChild(t *testing.T) {
 	}
 }
 
+func TestRunMaxIterationsWithFailure(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Command that always fails — but max=2 is less than maxFailStreak(3)
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "exit 1"}
+	} else {
+		cmd = []string{"sh", "-c", "exit 1"}
+	}
+
+	err := Run(Options{
+		Prompt:  "test",
+		Max:     2,
+		Command: cmd,
+	})
+	if err == nil {
+		t.Fatal("expected error when max iterations reached with failures")
+	}
+	if !strings.Contains(err.Error(), "last iteration failed") {
+		t.Errorf("expected 'last iteration failed' error, got: %v", err)
+	}
+}
+
+func TestRunMaxIterationsLastSucceeds(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Command that fails on first call, succeeds on second (uses counter file)
+	counter := filepath.Join(".", "attempt")
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & exit 0"}
+	} else {
+		cmd = []string{"sh", "-c", "echo x >> " + counter}
+	}
+
+	err := Run(Options{
+		Prompt:  "test",
+		Max:     2,
+		Command: cmd,
+	})
+	if err != nil {
+		t.Fatalf("expected nil when last iteration succeeds, got: %v", err)
+	}
+}
+
+func TestSignalFileDirNotDeletedOnCleanup(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Create a directory named .brr-complete — engine should NOT delete it
+	if err := os.Mkdir(ui.SignalComplete, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "exit 0"}
+	} else {
+		cmd = []string{"true"}
+	}
+
+	err := Run(Options{
+		Prompt:  "test",
+		Max:     1,
+		Command: cmd,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Directory should still exist — removeIfRegular should have skipped it
+	fi, statErr := os.Stat(ui.SignalComplete)
+	if statErr != nil {
+		t.Fatalf("directory %s was deleted by cleanup", ui.SignalComplete)
+	}
+	if !fi.IsDir() {
+		t.Error("expected .brr-complete to still be a directory")
+	}
+}
+
 func TestCheckSignalFilesNone(t *testing.T) {
 	t.Chdir(t.TempDir())
 

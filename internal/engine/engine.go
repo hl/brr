@@ -46,26 +46,18 @@ func Run(opts Options) error {
 	// If signal files exist from a previous run, respect them immediately
 	if stop := checkSignalFiles(); stop {
 		// Clean up the signal files so they don't block subsequent runs
-		os.Remove(ui.SignalComplete)
-		os.Remove(ui.SignalNeedsApproval)
+		removeIfRegular(ui.SignalComplete)
+		removeIfRegular(ui.SignalNeedsApproval)
 		return nil
 	}
 
 	// Clean up stale signal files from previous runs
-	os.Remove(ui.SignalComplete)
-	os.Remove(ui.SignalNeedsApproval)
+	removeIfRegular(ui.SignalComplete)
+	removeIfRegular(ui.SignalNeedsApproval)
 
-	// Clean up signal files on exit
-	defer func() {
-		if err := os.Remove(ui.SignalComplete); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "warning: could not clean up %s: %v\n", ui.SignalComplete, err)
-		}
-	}()
-	defer func() {
-		if err := os.Remove(ui.SignalNeedsApproval); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "warning: could not clean up %s: %v\n", ui.SignalNeedsApproval, err)
-		}
-	}()
+	// Clean up signal files on exit (only regular files — never delete dirs/symlinks)
+	defer func() { removeIfRegular(ui.SignalComplete) }()
+	defer func() { removeIfRegular(ui.SignalNeedsApproval) }()
 
 	// Track the currently running subprocess so we can forward signals
 	var mu sync.Mutex
@@ -235,7 +227,19 @@ func Run(opts Options) error {
 		i++
 	}
 
+	if lastErr != nil {
+		return fmt.Errorf("last iteration failed: %w", lastErr)
+	}
 	return nil
+}
+
+// removeIfRegular removes path only if it is a regular file.
+func removeIfRegular(path string) {
+	if fsutil.IsRegularFile(path) {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "warning: could not clean up %s: %v\n", path, err)
+		}
+	}
 }
 
 // checkSignalFiles checks for .brr-complete and .brr-needs-approval.

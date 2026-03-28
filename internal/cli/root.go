@@ -16,6 +16,8 @@ import (
 
 const exitCodeSIGINT = 130 // 128 + SIGINT(2)
 
+const maxPromptFileSize = 10 * 1024 * 1024 // 10 MiB
+
 var rootCmd = &cobra.Command{
 	Use:          "brr <prompt> [flags]",
 	Short:        "Your AI agent, but unhinged",
@@ -92,15 +94,18 @@ func run(cmd *cobra.Command, args []string) error {
 
 // resolvePrompt reads a prompt from a file path, .brr/prompts/<name>.md, or returns it as inline text.
 func resolvePrompt(nameOrPath string) (string, error) {
-	// If it's an existing regular file, read it directly
-	if fi, statErr := os.Stat(nameOrPath); statErr == nil {
+	// If it's an existing regular file, read it directly (rejects symlinks, FIFOs, etc.)
+	if fi, statErr := os.Lstat(nameOrPath); statErr == nil {
 		if fi.IsDir() {
 			// Don't treat directories as prompt files — fall through to named prompt lookup
-		} else if data, err := os.ReadFile(nameOrPath); err == nil {
+		} else if fi.Size() > maxPromptFileSize {
+			return "", fmt.Errorf("prompt file %s is too large (%d bytes, max %d)", nameOrPath, fi.Size(), maxPromptFileSize)
+		} else if data, err := fsutil.ReadRegularFile(nameOrPath); err == nil {
 			return string(data), nil
-		} else {
+		} else if !errors.Is(err, fsutil.ErrNotRegularFile) {
 			return "", fmt.Errorf("reading prompt file: %w", err)
 		}
+		// ErrNotRegularFile (symlink/FIFO) — fall through to named prompt / inline
 	} else if looksLikeFilePath(nameOrPath) {
 		// It looks like a file path — distinguish "not found" from other stat errors
 		if os.IsNotExist(statErr) {

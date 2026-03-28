@@ -52,25 +52,20 @@ func Init(force bool) error {
 
 	// Stage 2: create .brr/prompts/
 	if err := os.MkdirAll(promptDir, 0o755); err != nil {
-		restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists)
+		if rErr := restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists); rErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
+		}
 		return err
 	}
 
 	// Stage 3: update .gitignore (re-verify no symlink swap)
 	if err := rejectSymlink(".gitignore"); err != nil {
-		restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists)
-		if promptDirIsNew {
-			_ = os.Remove(promptDir)
-		}
+		rollbackInit(existingYAML, existingMode, yamlExists, promptDirIsNew, promptDir)
 		return err
 	}
 	gitignoreUpdated, err := updateGitignore()
 	if err != nil {
-		restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists)
-		// Remove .brr/prompts/ only if we created it
-		if promptDirIsNew {
-			_ = os.Remove(promptDir)
-		}
+		rollbackInit(existingYAML, existingMode, yamlExists, promptDirIsNew, promptDir)
 		return fmt.Errorf("updating .gitignore: %w", err)
 	}
 
@@ -94,11 +89,25 @@ func Init(force bool) error {
 	return nil
 }
 
+// rollbackInit undoes partial Init work, logging any rollback failures.
+func rollbackInit(existingYAML []byte, existingMode os.FileMode, yamlExists, promptDirIsNew bool, promptDir string) {
+	if rErr := restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists); rErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
+	}
+	if promptDirIsNew {
+		_ = os.Remove(promptDir)               // .brr/prompts/
+		_ = os.Remove(filepath.Dir(promptDir)) // .brr/ (only succeeds if empty)
+	}
+}
+
 // rejectSymlink returns an error if path exists and is a symlink.
 func rejectSymlink(path string) error {
 	fi, err := os.Lstat(path)
 	if err != nil {
-		return nil // doesn't exist, fine
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking %s: %w", path, err)
 	}
 	if fi.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("%s is a symlink — refusing to overwrite (security risk)", path)
@@ -107,12 +116,16 @@ func rejectSymlink(path string) error {
 }
 
 // restoreFile restores a file to its previous state, preserving the original permissions.
-func restoreFile(path string, data []byte, mode os.FileMode, existed bool) {
+// Returns an error if the rollback itself fails.
+func restoreFile(path string, data []byte, mode os.FileMode, existed bool) error {
 	if existed {
-		_ = os.WriteFile(path, data, mode)
-	} else {
-		_ = os.Remove(path)
+		return os.WriteFile(path, data, mode)
 	}
+	err := os.Remove(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // gitignoreEntries are lines brr needs in .gitignore.

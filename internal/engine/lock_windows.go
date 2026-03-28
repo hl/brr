@@ -29,7 +29,7 @@ func acquireLock() (*os.File, error) {
 	}
 	h := syscall.Handle(f.Fd())
 	ol := new(syscall.Overlapped)
-	r1, _, _ := procLockFileEx.Call(
+	r1, _, errno := procLockFileEx.Call(
 		uintptr(h),
 		uintptr(lockfileExclusiveLock|lockfileFailImmediately),
 		0,
@@ -38,11 +38,18 @@ func acquireLock() (*os.File, error) {
 	)
 	if r1 == 0 {
 		_ = f.Close()
-		return nil, fmt.Errorf("another brr instance is already running in this directory")
+		// ERROR_LOCK_VIOLATION (33) means another process holds the lock
+		if errno == syscall.Errno(33) {
+			return nil, fmt.Errorf("another brr instance is already running in this directory")
+		}
+		return nil, fmt.Errorf("acquiring lock: %w", errno)
 	}
 	return f, nil
 }
 
+// releaseLock releases the advisory lock and closes the file handle.
+// The lock file is intentionally kept on disk to prevent a race where
+// another process acquires the old handle just before it is deleted.
 func releaseLock(f *os.File) {
 	h := syscall.Handle(f.Fd())
 	ol := new(syscall.Overlapped)
@@ -53,5 +60,4 @@ func releaseLock(f *os.File) {
 		uintptr(unsafe.Pointer(ol)),
 	)
 	_ = f.Close()
-	_ = os.Remove(lockFile)
 }
