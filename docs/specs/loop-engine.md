@@ -1,0 +1,45 @@
+# Loop Engine
+
+## Purpose
+
+The loop engine is the core orchestrator of brr. It repeatedly spawns a configured command with the prompt piped to stdin, monitors for completion signals, enforces iteration limits, and manages failure streaks. It is the main runtime that ties together locking, signal handling, process management, and signal file detection.
+
+## Requirements
+
+1. The engine spawns the configured command once per iteration, piping the resolved prompt text to the subprocess's stdin.
+2. The engine runs iterations until one of these exit conditions is met: a signal file is detected, the maximum iteration count is reached, the process is interrupted by an OS signal, or three consecutive failures occur.
+3. When `max` is set to a positive integer, the engine runs at most that many iterations. When `max` is zero, iterations are unlimited.
+4. A command that exits with a non-zero status or fails to start counts as a failure. Three consecutive failures stop the engine with an error describing the failure streak.
+5. A successful iteration (exit code 0) resets the consecutive failure counter to zero.
+6. If the maximum iteration count is reached and the final iteration failed, the engine returns an error. If the final iteration succeeded, the engine returns successfully.
+7. Signal files are checked before spawning each iteration and after each iteration completes. Pre-existing signal files from a previous run are cleaned up and cause the engine to exit before the first iteration.
+8. Each iteration prints a header showing the iteration number and timestamp.
+9. The engine acquires an exclusive lock before starting and releases it on exit.
+10. When the engine stops, it communicates the stop reason to its caller. The stop reason distinguishes five cases: signal-file-complete, signal-file-approval, max-iterations-reached, fail-streak, and interrupted. The stop reason is not just an error -- successful exits (complete, approval, max-with-final-success) must also be distinguishable. For signal-file-approval, the stop reason includes the approval file contents read at detection time (before cleanup). This allows callers (such as notifications) to take reason-specific action without re-reading cleaned-up files.
+
+## Constraints
+
+- The engine must not leak child processes. All spawned processes must be cleaned up on exit regardless of how the engine stops.
+- Signal file cleanup must only remove regular files (not directories or symlinks).
+- The engine must work on Linux, macOS, and Windows.
+
+## Dependencies
+
+- Depends on `docs/specs/concurrent-run-prevention.md` for exclusive locking.
+- Depends on `docs/specs/signal-files.md` for the agent-to-brr communication protocol.
+- Depends on `docs/specs/signal-handling.md` for OS signal response.
+- Depends on `docs/specs/process-management.md` for cross-platform subprocess spawning.
+
+## Acceptance Criteria
+
+- [ ] Engine runs the correct number of iterations when max is set.
+- [ ] Engine runs indefinitely when max is zero (until another exit condition).
+- [ ] Three consecutive failures stop the engine with an error.
+- [ ] A success after failures resets the failure counter.
+- [ ] Signal files created during an iteration stop the engine after that iteration.
+- [ ] Pre-existing signal files cause immediate exit before the first iteration.
+- [ ] Max reached with final failure returns an error.
+- [ ] Max reached with final success returns nil.
+- [ ] Stop reason is reported for each exit condition (complete, approval, max, fail-streak, interrupted).
+- [ ] All requirements have corresponding tests that pass.
+- [ ] Existing tests continue to pass.

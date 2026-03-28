@@ -1,0 +1,49 @@
+# CLI Interface
+
+## Purpose
+
+The CLI interface is the user-facing entry point to brr. It parses commands and flags, wires together configuration and prompt resolution, invokes the engine, and translates engine results into appropriate exit codes and output. It also provides the `init` subcommand for project setup.
+
+## Requirements
+
+1. The primary command has three forms: `brr <prompt> [flags]` (run the loop), `brr init [--force]` (scaffold a project), and `brr --version` (print version). The prompt is required only for the run form.
+2. The `--max` flag sets the maximum number of iterations. Defaults to zero (unlimited). Negative values are rejected with an error.
+3. The `--profile` flag selects a named profile from the config. Defaults to the config's default profile when omitted.
+4. The `--version` flag prints the version string and exits. It does not require a prompt or a valid config.
+5. The `--notify` / `-n` flag enables desktop notifications on loop termination. Off by default.
+6. The `init` subcommand scaffolds a new brr project. It accepts a `--force` flag to overwrite existing files.
+7. On startup, brr prints an ASCII banner followed by a summary of the resolved configuration (profile name, command, max iterations).
+8. When the engine returns an interrupted error (from Ctrl+C), brr exits with code 130.
+9. When the engine returns any other error, brr exits with code 1.
+10. On success, brr exits with code 0.
+
+## Constraints
+
+- Version and commit hash are injected at build time via linker flags; they must not be hardcoded.
+- The CLI must not import or depend on engine internals beyond the `engine.Run()` entry point.
+- Terminal colors are only emitted when stdout is a terminal.
+
+## Dependencies
+
+- Depends on `docs/specs/configuration.md` for profile resolution.
+- Depends on `docs/specs/prompt-resolution.md` for prompt interpretation.
+- Depends on `docs/specs/loop-engine.md` for iteration execution.
+- Depends on `docs/specs/notifications.md` for the `--notify` flag behavior.
+- Depends on `docs/specs/project-initialization.md` for the `init` subcommand.
+
+## Acceptance Criteria
+
+- [ ] `brr <prompt>` runs the loop with the default profile.
+- [ ] `--max N` limits iterations to N.
+- [ ] `--profile P` selects profile P from the config.
+- [ ] `--version` prints the version and exits without requiring a prompt.
+- [ ] `--notify` enables desktop notifications on loop termination.
+- [ ] Negative `--max` values are rejected with an error.
+- [ ] `brr init` delegates to project initialization.
+- [ ] Exit code is 130 on Ctrl+C interruption.
+- [ ] Exit code is 1 on engine error.
+- [ ] Exit code is 0 on success.
+- [ ] Banner and config summary are printed on startup.
+- [ ] Colors are suppressed when stdout is not a terminal.
+- [ ] All requirements have corresponding tests that pass.
+- [ ] Existing tests continue to pass.
