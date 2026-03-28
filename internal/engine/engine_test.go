@@ -11,7 +11,7 @@ import (
 )
 
 func TestRunEmptyCommand(t *testing.T) {
-	err := Run(Options{Prompt: "hello", Command: nil})
+	_, err := Run(Options{Prompt: "hello", Command: nil})
 	if err == nil {
 		t.Error("expected error for empty command")
 	}
@@ -29,13 +29,16 @@ func TestRunMaxIterations(t *testing.T) {
 		cmd = []string{"sh", "-c", "echo x >> " + counter}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     3,
 		Command: cmd,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != ReasonMaxIterations {
+		t.Errorf("expected ReasonMaxIterations, got %d", result.Reason)
 	}
 
 	data, err := os.ReadFile(counter)
@@ -60,13 +63,16 @@ func TestRunFailStreak(t *testing.T) {
 		cmd = []string{"sh", "-c", "echo x >> " + counter + " && exit 1"}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     10,
 		Command: cmd,
 	})
 	if err == nil {
 		t.Fatal("expected error after consecutive failures")
+	}
+	if result.Reason != ReasonFailStreak {
+		t.Errorf("expected ReasonFailStreak, got %d", result.Reason)
 	}
 	if !strings.Contains(err.Error(), "stopped after 3 consecutive failures") {
 		t.Errorf("expected fail-streak error message, got: %v", err)
@@ -100,13 +106,16 @@ func TestRunSignalFileComplete(t *testing.T) {
 		cmd = []string{"sh", "-c", "touch " + marker}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     5,
 		Command: cmd,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != ReasonComplete {
+		t.Errorf("expected ReasonComplete, got %d", result.Reason)
 	}
 
 	// The child should never have run because the signal file pre-existed
@@ -131,13 +140,19 @@ func TestRunSignalFileNeedsApproval(t *testing.T) {
 		cmd = []string{"sh", "-c", "touch " + marker}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     5,
 		Command: cmd,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != ReasonApproval {
+		t.Errorf("expected ReasonApproval, got %d", result.Reason)
+	}
+	if result.ApprovalContent != "please review" {
+		t.Errorf("expected approval content 'please review', got %q", result.ApprovalContent)
 	}
 
 	// The child should never have run because the signal file pre-existed
@@ -160,13 +175,16 @@ func TestRunSignalFileCreatedByChild(t *testing.T) {
 		cmd = []string{"sh", "-c", "echo x >> " + counter + " && touch " + signalPath}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     5,
 		Command: cmd,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != ReasonComplete {
+		t.Errorf("expected ReasonComplete, got %d", result.Reason)
 	}
 
 	// Verify only one iteration ran (engine stopped after detecting signal file)
@@ -191,13 +209,16 @@ func TestRunMaxIterationsWithFailure(t *testing.T) {
 		cmd = []string{"sh", "-c", "exit 1"}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     2,
 		Command: cmd,
 	})
 	if err == nil {
 		t.Fatal("expected error when max iterations reached with failures")
+	}
+	if result.Reason != ReasonMaxIterations {
+		t.Errorf("expected ReasonMaxIterations, got %d", result.Reason)
 	}
 	if !strings.Contains(err.Error(), "last iteration failed") {
 		t.Errorf("expected 'last iteration failed' error, got: %v", err)
@@ -216,13 +237,16 @@ func TestRunMaxIterationsLastSucceeds(t *testing.T) {
 		cmd = []string{"sh", "-c", "echo x >> " + counter}
 	}
 
-	err := Run(Options{
+	result, err := Run(Options{
 		Prompt:  "test",
 		Max:     2,
 		Command: cmd,
 	})
 	if err != nil {
 		t.Fatalf("expected nil when last iteration succeeds, got: %v", err)
+	}
+	if result.Reason != ReasonMaxIterations {
+		t.Errorf("expected ReasonMaxIterations, got %d", result.Reason)
 	}
 }
 
@@ -241,7 +265,7 @@ func TestSignalFileDirNotDeletedOnCleanup(t *testing.T) {
 		cmd = []string{"true"}
 	}
 
-	err := Run(Options{
+	_, err := Run(Options{
 		Prompt:  "test",
 		Max:     1,
 		Command: cmd,
@@ -263,8 +287,8 @@ func TestSignalFileDirNotDeletedOnCleanup(t *testing.T) {
 func TestCheckSignalFilesNone(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if checkSignalFiles() {
-		t.Error("expected false when no signal files exist")
+	if checkSignalFiles() != nil {
+		t.Error("expected nil when no signal files exist")
 	}
 }
 
@@ -275,8 +299,12 @@ func TestCheckSignalFilesComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !checkSignalFiles() {
-		t.Error("expected true when .brr-complete exists")
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil when .brr-complete exists")
+	}
+	if sig.reason != ReasonComplete {
+		t.Errorf("expected ReasonComplete, got %d", sig.reason)
 	}
 }
 
@@ -287,8 +315,15 @@ func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !checkSignalFiles() {
-		t.Error("expected true when .brr-needs-approval exists")
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil when .brr-needs-approval exists")
+	}
+	if sig.reason != ReasonApproval {
+		t.Errorf("expected ReasonApproval, got %d", sig.reason)
+	}
+	if sig.approvalContent != "review this" {
+		t.Errorf("expected approval content 'review this', got %q", sig.approvalContent)
 	}
 }
 
@@ -300,8 +335,8 @@ func TestCheckSignalFilesDirectoryIgnored(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if checkSignalFiles() {
-		t.Error("expected false when .brr-complete is a directory, not a regular file")
+	if checkSignalFiles() != nil {
+		t.Error("expected nil when .brr-complete is a directory, not a regular file")
 	}
 }
 
@@ -317,8 +352,8 @@ func TestCheckSignalFilesSymlinkIgnored(t *testing.T) {
 		t.Skip("symlinks not supported")
 	}
 
-	if checkSignalFiles() {
-		t.Error("expected false when .brr-complete is a symlink, not a regular file")
+	if checkSignalFiles() != nil {
+		t.Error("expected nil when .brr-complete is a symlink, not a regular file")
 	}
 }
 
@@ -335,8 +370,15 @@ func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
 	}
 	defer os.Chmod(ui.SignalNeedsApproval, 0o644)
 
-	if !checkSignalFiles() {
-		t.Error("expected true when .brr-needs-approval exists but is unreadable")
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil when .brr-needs-approval exists but is unreadable")
+	}
+	if sig.reason != ReasonApproval {
+		t.Errorf("expected ReasonApproval, got %d", sig.reason)
+	}
+	if sig.approvalContent != "" {
+		t.Errorf("expected empty approval content for unreadable file, got %q", sig.approvalContent)
 	}
 }
 
@@ -436,7 +478,7 @@ func TestRunSignalFileCleanedAfterEarlyStop(t *testing.T) {
 		cmd = []string{"sh", "-c", "touch " + marker}
 	}
 
-	err := Run(Options{
+	_, err := Run(Options{
 		Prompt:  "test",
 		Max:     5,
 		Command: cmd,

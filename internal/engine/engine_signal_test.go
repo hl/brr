@@ -35,7 +35,7 @@ func TestSignalFirstCtrlCStopsAfterIteration(t *testing.T) {
 	var runErr error
 	done := make(chan struct{})
 	go func() {
-		runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
+		_, runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
 		close(done)
 	}()
 
@@ -69,7 +69,7 @@ func TestSignalSecondCtrlCInterruptsChild(t *testing.T) {
 	var runErr error
 	done := make(chan struct{})
 	go func() {
-		runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
+		_, runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
 		close(done)
 	}()
 
@@ -103,7 +103,7 @@ func TestSignalThirdCtrlCForceKills(t *testing.T) {
 	var runErr error
 	done := make(chan struct{})
 	go func() {
-		runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
+		_, runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
 		close(done)
 	}()
 
@@ -138,7 +138,7 @@ func TestSignalSIGTERMForwardsToChild(t *testing.T) {
 	var runErr error
 	done := make(chan struct{})
 	go func() {
-		runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
+		_, runErr = Run(Options{Prompt: "test", Max: 100, Command: cmd})
 		close(done)
 	}()
 

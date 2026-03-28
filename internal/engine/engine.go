@@ -23,6 +23,23 @@ const maxFailStreak = 3
 // ErrInterrupted is returned when the engine is stopped by a user signal (Ctrl+C).
 var ErrInterrupted = fmt.Errorf("interrupted")
 
+// StopReason indicates why the engine stopped.
+type StopReason int
+
+const (
+	ReasonComplete      StopReason = iota // .brr-complete signal file
+	ReasonApproval                        // .brr-needs-approval signal file
+	ReasonMaxIterations                   // max iteration count reached
+	ReasonFailStreak                      // too many consecutive failures
+	ReasonInterrupted                     // user signal (Ctrl+C / SIGTERM)
+)
+
+// Result carries the structured stop reason from a completed engine run.
+type Result struct {
+	Reason          StopReason
+	ApprovalContent string // populated only for ReasonApproval
+}
+
 // Options configures a loop run.
 type Options struct {
 	Prompt  string   // resolved prompt text
@@ -31,24 +48,26 @@ type Options struct {
 }
 
 // Run executes the loop until completion, max iterations, or interrupt.
-func Run(opts Options) error {
+// The returned Result is always non-nil when error is nil, and may also be
+// non-nil on error paths to communicate the stop reason.
+func Run(opts Options) (*Result, error) {
 	if len(opts.Command) == 0 {
-		return fmt.Errorf("no command configured — set 'command' in .brr.yaml")
+		return nil, fmt.Errorf("no command configured — set 'command' in .brr.yaml")
 	}
 
 	// Prevent concurrent brr runs in the same directory
 	lf, err := acquireLock()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer releaseLock(lf)
 
 	// If signal files exist from a previous run, respect them immediately
-	if stop := checkSignalFiles(); stop {
+	if sig := checkSignalFiles(); sig != nil {
 		// Clean up the signal files so they don't block subsequent runs
 		removeIfRegular(ui.SignalComplete)
 		removeIfRegular(ui.SignalNeedsApproval)
-		return nil
+		return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
 	}
 
 	// Clean up stale signal files from previous runs
@@ -137,11 +156,11 @@ func Run(opts Options) error {
 		// Check if user requested stop (first Ctrl+C) between iterations
 		if stopping.Load() {
 			fmt.Printf("\n  %s%sStopped%s.\n", ui.Bold, ui.Yellow, ui.Reset)
-			return ErrInterrupted
+			return &Result{Reason: ReasonInterrupted}, ErrInterrupted
 		}
 
-		if stop := checkSignalFiles(); stop {
-			return nil
+		if sig := checkSignalFiles(); sig != nil {
+			return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
 		}
 
 		// Print iteration header
@@ -178,7 +197,7 @@ func Run(opts Options) error {
 			)
 			if failStreak >= maxFailStreak {
 				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
-				return fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
+				return &Result{Reason: ReasonFailStreak}, fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
 			}
 			i++
 			continue
@@ -195,14 +214,14 @@ func Run(opts Options) error {
 		mu.Unlock()
 
 		// Check for signal files immediately after subprocess exits
-		if stop := checkSignalFiles(); stop {
-			return nil
+		if sig := checkSignalFiles(); sig != nil {
+			return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
 		}
 
 		// If user requested stop (first Ctrl+C), exit gracefully now that the iteration is done
 		if stopping.Load() {
 			fmt.Printf("\n  %s%sStopped after iteration %d%s.\n", ui.Bold, ui.Yellow, iterNum, ui.Reset)
-			return ErrInterrupted
+			return &Result{Reason: ReasonInterrupted}, ErrInterrupted
 		}
 
 		if err != nil {
@@ -217,7 +236,7 @@ func Run(opts Options) error {
 			)
 			if failStreak >= maxFailStreak {
 				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
-				return fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
+				return &Result{Reason: ReasonFailStreak}, fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
 			}
 		} else {
 			failStreak = 0
@@ -228,9 +247,9 @@ func Run(opts Options) error {
 	}
 
 	if lastErr != nil {
-		return fmt.Errorf("last iteration failed: %w", lastErr)
+		return &Result{Reason: ReasonMaxIterations}, fmt.Errorf("last iteration failed: %w", lastErr)
 	}
-	return nil
+	return &Result{Reason: ReasonMaxIterations}, nil
 }
 
 // removeIfRegular removes path only if it is a regular file.
@@ -242,37 +261,45 @@ func removeIfRegular(path string) {
 	}
 }
 
+// signalResult is returned by checkSignalFiles when a signal file is found.
+type signalResult struct {
+	reason          StopReason
+	approvalContent string
+}
+
 // checkSignalFiles checks for .brr-complete and .brr-needs-approval.
 // Only regular files are treated as signals (symlinks and directories are ignored).
-// Returns true if the engine should stop.
-func checkSignalFiles() bool {
+// Returns nil if no signal file was found.
+func checkSignalFiles() *signalResult {
 	if fsutil.IsRegularFile(ui.SignalComplete) {
 		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, ui.SignalComplete)
-		return true
+		return &signalResult{reason: ReasonComplete}
 	}
 	// Try to open and read in one pass; fall back to existence check for unreadable files
 	if f, err := fsutil.OpenRegularFile(ui.SignalNeedsApproval); err == nil {
 		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
 		content, readErr := readCappedFromFile(f, maxApprovalFileSize)
 		_ = f.Close()
+		var approvalContent string
 		if readErr == nil {
 			trimmed := strings.TrimSpace(content)
 			if trimmed != "" {
 				fmt.Println(trimmed)
+				approvalContent = trimmed
 			} else {
 				fmt.Println("  (no details provided)")
 			}
 		} else {
 			fmt.Printf("  (could not read details: %v)\n", readErr)
 		}
-		return true
+		return &signalResult{reason: ReasonApproval, approvalContent: approvalContent}
 	} else if fsutil.IsRegularFile(ui.SignalNeedsApproval) {
 		// File exists but can't be opened (e.g. permissions) — still honor the signal
 		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
 		fmt.Printf("  (could not read details: %v)\n", err)
-		return true
+		return &signalResult{reason: ReasonApproval}
 	}
-	return false
+	return nil
 }
 
 // readCappedFromFile reads up to maxBytes from an already-open file, appending a truncation notice if needed.

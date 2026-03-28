@@ -81,7 +81,7 @@ func run(cmd *cobra.Command, args []string) error {
 	printBanner()
 	printConfig(args[0], resolvedName, command, max)
 
-	err = engine.Run(engine.Options{
+	_, err = engine.Run(engine.Options{
 		Prompt:  promptText,
 		Max:     max,
 		Command: command,
