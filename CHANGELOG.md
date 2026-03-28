@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] "Locks Changed" - 2026-03-28
+
+### Fixed
+
+- Lock file no longer deleted on release, preventing a race where two processes could both acquire the lock
+- Lock errors now show the real cause (e.g. permission denied) instead of always blaming a concurrent instance
+- `Run()` now returns an error when max iterations reached but the last iteration failed (previously exited 0)
+- Signal file cleanup no longer deletes directories or symlinks that happen to share signal file names
+- Prompt resolution rejects symlinks and FIFOs instead of following them
+- Prompt files larger than 10 MiB are rejected with a clear error
+- `rejectSymlink` no longer swallows non-ENOENT errors from `Lstat`
+- Scaffold rollback reports errors instead of silently discarding them, and cleans up empty `.brr/` directories
+
 ## [0.1.2] "Thoroughly Frisked" - 2026-03-27
 
 ### Added
