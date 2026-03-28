@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>brr | Your AI agent, but unhinged.</title>
+    <meta
+      name="description"
+      content="brr runs prompts in a loop with fresh agent sessions every iteration. Use Claude, Codex, or any CLI that reads prompts from stdin."
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar" id="top">
+        <a class="wordmark" href="#top">brr</a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="#install">Install</a>
+          <a href="#usage">Usage</a>
+          <a href="#profiles">Profiles</a>
+          <a href="#signals">Signals</a>
+          <a href="https://github.com/hl/brr">GitHub</a>
+        </nav>
+      </header>
+
+      <main class="terminal-shell">
+        <div class="terminal-bar" aria-hidden="true">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+          <span class="terminal-label">./brr --help</span>
+        </div>
+
+        <div class="terminal-body">
+          <section class="terminal-block banner-block">
+            <pre class="ascii-art" aria-label="brr banner"><span class="cyan">██████╗ ██████╗ ██████╗</span>
+<span class="blue">██╔══██╗██╔══██╗██╔══██╗</span>
+<span class="magenta">██████╔╝██████╔╝██████╔╝</span>
+<span class="red">██╔══██╗██╔══██╗██╔══██╗</span>
+<span class="yellow">██████╔╝██║  ██║██║  ██║</span>
+<span class="green">╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝</span></pre>
+            <p class="tagline">your AI agent, but unhinged</p>
+            <p class="repo-link"><a href="https://github.com/hl/brr">https://github.com/hl/brr</a></p>
+            <p class="lead">
+              brr runs a prompt in a loop, spinning up a fresh session for each iteration. This page keeps the
+              same terminal-first feel as the CLI help output, but adds the install path, working examples, and
+              config shape in one continuous view.
+            </p>
+          </section>
+
+          <section class="terminal-block" id="install">
+            <p class="section-kicker">$ section install</p>
+            <div class="inline-grid inline-grid-3">
+              <div class="inline-card">
+                <p class="label">brew</p>
+                <pre><code>brew install hl/tap/brr</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">go install</p>
+                <pre><code>go install github.com/hl/brr/cmd/brr@latest</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">build from source</p>
+                <pre><code>git clone https://github.com/hl/brr
+cd brr
+make build</code></pre>
+              </div>
+            </div>
+          </section>
+
+          <section class="terminal-block" id="usage">
+            <p class="section-kicker">$ brr --help</p>
+            <div class="help-columns">
+              <div class="help-panel">
+                <p class="heading">Usage</p>
+                <pre><code>brr &lt;prompt&gt; [flags]
+brr [command]</code></pre>
+              </div>
+              <div class="help-panel">
+                <p class="heading">Available Commands</p>
+                <pre><code>completion  Generate the autocompletion script
+help        Help about any command
+init        Scaffold a project for brr</code></pre>
+              </div>
+              <div class="help-panel">
+                <p class="heading">Flags</p>
+                <pre><code>-h, --help             help for brr
+-m, --max int          max iterations (0 = unlimited)
+-p, --profile string   profile from .brr.yaml
+-v, --version          version for brr</code></pre>
+              </div>
+            </div>
+          </section>
+
+          <section class="terminal-block">
+            <p class="section-kicker">$ examples</p>
+            <div class="inline-grid inline-grid-2">
+              <div class="inline-card">
+                <p class="label">run a prompt file</p>
+                <pre><code>brr prompts/build.md --max 20</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">resolve a named prompt</p>
+                <pre><code>brr plan --max 3</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">inline prompt</p>
+                <pre><code>brr "Fix all TODO comments in src/" --max 5</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">switch profiles</p>
+                <pre><code>brr plan --max 10 -p codex</code></pre>
+              </div>
+            </div>
+          </section>
+
+          <section class="terminal-block" id="profiles">
+            <p class="section-kicker">$ cat .brr.yaml</p>
+            <div class="config-layout">
+              <div class="copy-block">
+                <p>
+                  Profiles are intentionally plain. Each one defines a command and argument list, and brr pipes
+                  the prompt to stdin. That keeps the loop runner agent-agnostic.
+                </p>
+                <p>
+                  Prompt resolution order: existing file, then `.brr/prompts/&lt;name&gt;.md`, then your user config
+                  prompts directory, then inline text.
+                </p>
+              </div>
+              <pre class="config-block"><code>default: claude
+
+profiles:
+  claude:
+    command: claude
+    args: [-p, --dangerously-skip-permissions, --model, sonnet, --max-turns, "200"]
+
+  opus:
+    command: claude
+    args: [-p, --dangerously-skip-permissions, --model, opus, --max-turns, "200"]
+
+  codex:
+    command: codex
+    args: [exec, --ephemeral, --dangerously-bypass-approvals-and-sandbox, --model, gpt-5.4, -]</code></pre>
+            </div>
+          </section>
+
+          <section class="terminal-block" id="signals">
+            <p class="section-kicker">$ ls -a .brr-*</p>
+            <div class="signal-list">
+              <div class="signal-item">
+                <p class="signal-name">.brr-complete</p>
+                <p>Prompt created this file because all work is finished, so the loop stops cleanly.</p>
+              </div>
+              <div class="signal-item">
+                <p class="signal-name">.brr-needs-approval</p>
+                <p>Prompt needs a human decision, so brr stops and surfaces the file contents.</p>
+              </div>
+              <div class="signal-item">
+                <p class="signal-name">three consecutive failures</p>
+                <p>brr aborts automatically instead of spinning forever on a broken task.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="terminal-block">
+            <p class="section-kicker">$ prompt shape</p>
+            <pre class="prompt-block"><code>You are one iteration of a loop. Do one unit of work, then exit.
+
+1. Read the state (a file, an API, a queue)
+2. Pick one item
+3. Do the work
+4. Update the state (mark it done, commit, etc.)
+5. If nothing left, create .brr-complete and exit</code></pre>
+          </section>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <p>Based on The Ralph Playbook. Built for agent loops that should stay sharp instead of bloated.</p>
+      </footer>
+    </div>
+  </body>
+</html>

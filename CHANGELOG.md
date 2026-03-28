@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.1.3] "Locks Changed" - 2026-03-28
 
+### Added
+
+- GitHub Pages landing page styled after `brr --help`, including the ASCII banner, CLI color palette, install and usage docs, and a workflow to deploy `docs/` from `main`
+
 ### Fixed
 
 - Lock file no longer deleted on release, preventing a race where two processes could both acquire the lock
