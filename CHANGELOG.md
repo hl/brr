@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Desktop notifications on loop termination via `--notify` / `-n` flag — sends OS-native notifications for completion, approval needed, max iterations, and fail streak events (macOS via osascript, Linux via notify-send)
+- Structured `StopReason` in engine results, distinguishing all five exit conditions (complete, approval, max-iterations, fail-streak, interrupted)
+
 ## [0.1.3] "Locks Changed" - 2026-03-28
 
 ### Added

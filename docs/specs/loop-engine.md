@@ -40,6 +40,6 @@ The loop engine is the core orchestrator of brr. It repeatedly spawns a configur
 - [ ] Pre-existing signal files cause immediate exit before the first iteration.
 - [ ] Max reached with final failure returns an error.
 - [ ] Max reached with final success returns nil.
-- [ ] Stop reason is reported for each exit condition (complete, approval, max, fail-streak, interrupted).
+- [x] Stop reason is reported for each exit condition (complete, approval, max, fail-streak, interrupted).
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.
