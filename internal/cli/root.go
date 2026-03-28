@@ -10,6 +10,7 @@ import (
 	"github.com/hl/brr/internal/config"
 	"github.com/hl/brr/internal/engine"
 	"github.com/hl/brr/internal/fsutil"
+	"github.com/hl/brr/internal/notify"
 	"github.com/hl/brr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -30,6 +31,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().IntP("max", "m", 0, "max iterations (0 = unlimited)")
 	rootCmd.Flags().StringP("profile", "p", "", "agent profile from .brr.yaml (uses 'default' if omitted)")
+	rootCmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the loop stops")
 
 	defaultHelp := rootCmd.HelpFunc()
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
@@ -78,18 +80,31 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("prompt is empty")
 	}
 
+	doNotify, err := cmd.Flags().GetBool("notify")
+	if err != nil {
+		return fmt.Errorf("reading --notify flag: %w", err)
+	}
+
 	printBanner()
 	printConfig(args[0], resolvedName, command, max)
 
-	_, err = engine.Run(engine.Options{
+	result, runErr := engine.Run(engine.Options{
 		Prompt:  promptText,
 		Max:     max,
 		Command: command,
 	})
-	if errors.Is(err, engine.ErrInterrupted) {
+
+	// Send notification (best-effort — failure is logged but does not affect exit code)
+	if doNotify && result != nil && result.Reason != engine.ReasonInterrupted {
+		if nErr := notify.Send(result); nErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
+		}
+	}
+
+	if errors.Is(runErr, engine.ErrInterrupted) {
 		cmd.SilenceErrors = true
 	}
-	return err
+	return runErr
 }
 
 // resolvePrompt reads a prompt from a file path, .brr/prompts/<name>.md, or returns it as inline text.

@@ -21,6 +21,7 @@ func newTestRootCmd() *cobra.Command {
 	}
 	cmd.Flags().IntP("max", "m", 0, "max iterations")
 	cmd.Flags().StringP("profile", "p", "", "profile name")
+	cmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the loop stops")
 	return cmd
 }
 
@@ -184,6 +185,17 @@ func TestRunIntegrationNoArgs(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for missing args")
+	}
+}
+
+func TestRunIntegrationNotifyFlag(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeTestConfig(t)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"hello world", "-m", "1", "-n"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error with --notify: %v", err)
 	}
 }
 
