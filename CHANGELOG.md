@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] "Read the Signs" - 2026-03-29
+
+### Changed
+
+- Expanded signal file documentation (`.brr-complete`, `.brr-needs-approval`, `.brr.lock`) across CLI `--help`, landing page, and README with clearer descriptions and usage guidance
+
 ## [0.2.0] "Ding When Done" - 2026-03-29
 
 ### Added
