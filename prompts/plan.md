@@ -1,23 +1,28 @@
 You are one iteration of a planning loop. Process one spec, update the plan, commit, exit.
 
+## Phase 0: Precondition
+
+1. **Recover dirty state.** Run `git status --porcelain`. If there are uncommitted changes to `IMPLEMENTATION_PLAN.md` (a previous iteration crashed between writing and committing), stage and commit them with `docs(plan): recover uncommitted plan changes` before proceeding. If there are other uncommitted changes, `git stash --include-untracked -m "recovered: dirty state from crashed plan iteration"`.
+
 ## Phase 1: Route
 
 Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
 
-**A) File doesn't exist, or has no `## Spec Queue` section** → Phase 2 (Build Queue)
+**A) File doesn't exist, or has no `## Spec Queue` section and no task sections** → Phase 2 (Build Queue)
+**A2) File exists with task sections but no `## Spec Queue` section** → Phase 2 (Build Queue), but the existing tasks MUST be preserved below the new queue
 **B) `## Spec Queue` section exists and has entries** → Phase 3 (Process Spec)
 **C) `## Spec Queue` section exists but is empty** → Phase 4 (Finalize)
 
 ## Phase 2: Build Queue
 
 1. Read the project's `AGENTS.md` and codebase to understand the project scope and goals
-2. Identify logical components or features that need implementation
-3. Build a dependency graph: if component A depends on component B, A should appear after B in the queue
-4. Topologically sort so dependencies come before dependents. Leaf components (no dependencies) go first; high-level features (CLI, web UI) go last.
+2. Identify the inputs to plan against. If `docs/specs/` exists with spec files, use those. Otherwise, identify logical components or features from the codebase and AGENTS.md.
+3. Build a dependency graph: if component A depends on component B, A should appear after B in the queue. For spec files, read the `## Dependencies` section of each spec.
+4. Topologically sort so dependencies come before dependents. If the graph contains cycles, break them by placing the component with fewer incoming edges first and log which cycle was broken as a comment in the queue (e.g. `<!-- cycle broken: A ↔ B, A placed first -->`). Within the same dependency depth, group components that share the most dependencies adjacently. Leaf components (no dependencies) go first; high-level features (CLI, web UI, dashboards) go last.
 5. Create or update `IMPLEMENTATION_PLAN.md` — add a `## Spec Queue` section at the top with one line per component in the sorted order:
    ```
    ## Spec Queue
-   - component-a
+   - component-a (or docs/specs/component-a.md)
    - component-b
    - component-c
    ...
@@ -29,29 +34,31 @@ Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
 ## Phase 3: Process Spec
 
 1. Take the first entry from `## Spec Queue` — this is the component to process
-2. Read `AGENTS.md` and the rest of `IMPLEMENTATION_PLAN.md`
-3. Search all source and test files for existing implementations related to this component. Don't assume functionality is missing — confirm with code search first.
-4. Compare the implementation against the component's requirements. Identify:
+2. If the entry references a file that doesn't exist (renamed or deleted), remove it from the queue, commit, and exit. The next iteration will pick up the next entry.
+3. Read any associated spec or documentation, `AGENTS.md`, and the rest of `IMPLEMENTATION_PLAN.md`
+4. Search all source and test files for existing implementations related to this component. Don't assume functionality is missing — confirm with code search first.
+5. Compare the implementation against the component's requirements. Identify:
+   - Wrong approach: spec prescribes specific tools, frameworks, or patterns and the code uses something different — this is an implementation gap, not a docs issue
    - Missing functionality
    - Partial implementations
    - Requirements not covered by tests
    - TODOs, placeholders, stubs
    - Skipped/flaky tests
    - Known bugs
-5. Update `IMPLEMENTATION_PLAN.md`:
+6. Update `IMPLEMENTATION_PLAN.md`:
    - Add, update, or remove tasks for this component in the task sections below the queue
-   - Remove the processed component from `## Spec Queue`
-   - If the component is fully implemented with no gaps, don't add tasks — just remove it from the queue
-6. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): check <component-name> against implementation"`. Skip if no changes.
-7. Exit
+   - Remove the processed entry from `## Spec Queue`
+   - If every requirement and acceptance criterion is satisfied (confirm each one explicitly), don't add tasks — just remove it from the queue
+7. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): check <component-name> against implementation"`. Skip if no changes.
+8. Exit
 
 ## Phase 4: Finalize
 
 1. Read `IMPLEMENTATION_PLAN.md`
 2. Final cleanup pass:
    - Prioritize: blockers/dependencies first, then core functionality, then refinements
-   - Deduplicate tasks across specs
-   - Remove any tasks where the implementation verifiably satisfies the spec (confirm with code search)
+   - Deduplicate tasks across components
+   - Remove any tasks where the implementation verifiably satisfies the requirements (confirm with code search)
    - Delete the empty `## Spec Queue` section
    - Delete empty phase headings
 3. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): finalize implementation plan"`. Skip if no changes.
