@@ -146,15 +146,31 @@ profiles:
           </section>
 
           <section class="terminal-block" id="signals">
-            <p class="section-kicker">$ ls -a .brr-*</p>
+            <p class="section-kicker">$ ls -a .brr*</p>
             <div class="signal-list">
               <div class="signal-item">
                 <p class="signal-name">.brr-complete</p>
-                <p>Prompt created this file because all work is finished, so the loop stops cleanly.</p>
+                <p>
+                  The agent creates this file when all work is finished. brr detects it, stops
+                  the loop, and removes the file. Your prompt should create this as the last step
+                  when there are no items left to process.
+                </p>
               </div>
               <div class="signal-item">
                 <p class="signal-name">.brr-needs-approval</p>
-                <p>Prompt needs a human decision, so brr stops and surfaces the file contents.</p>
+                <p>
+                  The agent creates this file when it needs a human decision before continuing.
+                  brr stops the loop and prints the file contents (up to 4 KiB) so you can see
+                  what the agent is asking about. Resolve the issue, delete the file, and re-run.
+                </p>
+              </div>
+              <div class="signal-item">
+                <p class="signal-name">.brr.lock</p>
+                <p>
+                  Prevents multiple brr instances from running in the same directory at the same
+                  time. Acquired automatically on start, released on exit. The file stays on disk
+                  between runs — this is intentional. Added to .gitignore by <code>brr init</code>.
+                </p>
               </div>
               <div class="signal-item">
                 <p class="signal-name">three consecutive failures</p>

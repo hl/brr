@@ -99,11 +99,13 @@ Put prompts in `.brr/prompts/` (per-project) or `<os-config-dir>/brr/prompts/` (
 
 brr pipes the same prompt to the configured command, once per iteration. Each run gets a fresh process with a clean context window.
 
-Prompts control the loop by creating signal files:
-- `.brr-complete` — all done, stop
-- `.brr-needs-approval` — needs a human, stop and print contents
+The loop is controlled by signal files in the working directory:
 
-Three consecutive failures stop the loop automatically.
+- **`.brr-complete`** — the agent creates this when all work is finished. brr detects it, stops the loop, and removes the file.
+- **`.brr-needs-approval`** — the agent creates this when it needs a human decision. brr stops the loop and prints the file contents (up to 4 KiB). Resolve the issue, delete the file, and re-run.
+- **`.brr.lock`** — prevents multiple brr instances from running in the same directory. Acquired on start, released on exit. The file stays on disk between runs (this is intentional). Added to `.gitignore` by `brr init`.
+
+Three consecutive failures also stop the loop automatically.
 
 ## Safety
 
