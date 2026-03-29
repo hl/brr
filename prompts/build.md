@@ -52,6 +52,8 @@ Spawn a Task agent (subagent_type: general-purpose, model: opus) with:
 
 If validation could not be fixed, discard the broken implementation with `git stash --include-untracked -m "failed: <task description>"`, then document the blocker in IMPLEMENTATION_PLAN.md, commit only the blocker update, and exit. The stash preserves the failed attempt for debugging. The next iteration will get a fresh attempt.
 
+**Spec guard:** Before proceeding to Phase 4, run `git diff --name-only` and verify no file under `docs/specs/` was modified. If any spec file appears in the diff, `git checkout -- docs/specs/` to discard spec changes and re-evaluate the task — the implementation must change code, not specs.
+
 ## Phase 4: Review & Simplify (only if validation passed)
 
 Run `/simplify` on the current changes. If `/simplify` is unavailable, review the working diff (`git diff`) for dead code, unnecessary abstractions, or copy-paste that could be a shared helper — apply simplifications if trivial.
@@ -71,6 +73,7 @@ If the review finds blocking issues, fix them and re-run validation (Phase 3). D
 
 ## Rules (priority order)
 
+- **Specs are immutable.** NEVER modify files under `docs/specs/`. Specs are the source of truth — change code to match specs, never the reverse. If a spec is wrong, escalate the task as `[APPROVAL]` and exit.
 - Implement completely. No placeholders or stubs.
 - Parallel agents must not write to the same files — if in doubt, use 2A.
 - Keep AGENTS.md operational only — status updates belong in IMPLEMENTATION_PLAN.md.

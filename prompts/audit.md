@@ -19,7 +19,7 @@ Everything else — dead code, missing types, doc drift, style, missing test cov
 
 1. Read `AGENTS.md` and any specs or docs in the project to understand the architecture and conventions.
 2. Identify the major subsystems in the codebase (e.g. by directory structure, package boundaries, or logical grouping).
-3. Spawn a team of parallel agents (subagent_type: general-purpose, model: opus) — one per subsystem. Each agent reads `AGENTS.md` and relevant specs before starting.
+3. Spawn a team of parallel agents (subagent_type: general-purpose, model: opus) — one per subsystem. Each agent reads `AGENTS.md` and relevant specs before starting. Specs are immutable — when code diverges from a spec, the code is wrong. Never suggest spec changes.
 
 Each agent audits its subsystem for:
 - **Spec divergence:** behavior that contradicts documented specs or requirements
@@ -43,6 +43,7 @@ Wait for all agents to complete before proceeding.
    - Format: `- [ ] **X.X — Description** — files: list of files`
    - Order by impact: correctness/security bugs first, then resource leaks, then crash-path issues
    - Each task is one atomic, committable unit of work
+   - **Every task must change code, never specs.** If code diverges from a spec, the task fixes the code. If a spec appears wrong, flag the task as `[APPROVAL]` for human review — do not propose spec edits.
 5. Commit: `docs(plan): audit findings`
 
 ## Rules
@@ -50,3 +51,4 @@ Wait for all agents to complete before proceeding.
 - Read `AGENTS.md` and `CLAUDE.md` before starting — they define all project constraints.
 - If confidence in a finding is below 95%, investigate further. If it still doesn't meet the severity gate, drop it.
 - The output of this prompt is `IMPLEMENTATION_PLAN.md` — do not begin fixing anything.
+- **Specs are immutable.** NEVER modify files under `docs/specs/`. If a spec is wrong, note it in the plan as an `[APPROVAL]` task for human review — do not fix it.

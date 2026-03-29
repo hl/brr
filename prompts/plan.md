@@ -45,12 +45,13 @@ Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
    - TODOs, placeholders, stubs
    - Skipped/flaky tests
    - Known bugs
-6. Update `IMPLEMENTATION_PLAN.md`:
+6. **Specs are immutable.** If the project has specs in `docs/specs/`, NEVER propose tasks that modify, update, or reconcile them. If code diverges from a spec, the task must change code to match the spec — never the reverse. If a spec appears wrong, flag the task as `[APPROVAL]` so a human can decide.
+7. Update `IMPLEMENTATION_PLAN.md`:
    - Add, update, or remove tasks for this component in the task sections below the queue
    - Remove the processed entry from `## Spec Queue`
    - If every requirement and acceptance criterion is satisfied (confirm each one explicitly), don't add tasks — just remove it from the queue
-7. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): check <component-name> against implementation"`. Skip if no changes.
-8. Exit
+8. `git add IMPLEMENTATION_PLAN.md && git commit -m "docs(plan): check <component-name> against implementation"`. Skip if no changes.
+9. Exit
 
 ## Phase 4: Finalize
 
@@ -76,3 +77,4 @@ Read `IMPLEMENTATION_PLAN.md` (if it exists) and determine which phase applies:
 - Hygiene: delete completed tasks entirely (do not mark `[x]`)
 
 IMPORTANT: Plan only. Do NOT implement anything.
+IMPORTANT: If the project has specs, they are immutable. NEVER generate tasks that propose modifying, updating, or reconciling spec files. Code conforms to specs — not the other way around.
