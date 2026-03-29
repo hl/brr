@@ -86,6 +86,7 @@ init        Scaffold a project for brr</code></pre>
                 <p class="heading">Flags</p>
                 <pre><code>-h, --help             help for brr
 -m, --max int          max iterations (0 = unlimited)
+-n, --notify           send desktop notification on stop
 -p, --profile string   profile from .brr.yaml
 -v, --version          version for brr</code></pre>
               </div>
@@ -108,8 +109,8 @@ init        Scaffold a project for brr</code></pre>
                 <pre><code>brr "Fix all TODO comments in src/" --max 5</code></pre>
               </div>
               <div class="inline-card">
-                <p class="label">switch profiles</p>
-                <pre><code>brr plan --max 10 -p codex</code></pre>
+                <p class="label">notify when done</p>
+                <pre><code>brr build --max 20 --notify</code></pre>
               </div>
             </div>
           </section>

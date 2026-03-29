@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] "Ding When Done" - 2026-03-29
+
 ### Added
 
 - Desktop notifications on loop termination via `--notify` / `-n` flag — sends OS-native notifications for completion, approval needed, max iterations, and fail streak events (macOS via osascript, Linux via notify-send)
 - Structured `StopReason` in engine results, distinguishing all five exit conditions (complete, approval, max-iterations, fail-streak, interrupted)
+- Hardened default prompts: dirty state recovery, repeated failure detection with auto-escalation, retry limits, and combined review phase with fallbacks
+- New `audit` prompt for autonomous codebase auditing with parallel agents and severity gating
 
 ## [0.1.3] "Locks Changed" - 2026-03-28
 
