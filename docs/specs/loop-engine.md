@@ -9,17 +9,18 @@ The loop engine is the core orchestrator of brr. It repeatedly spawns a configur
 1. The engine spawns the configured command once per iteration, piping the resolved prompt text to the subprocess's stdin.
 2. The engine runs iterations until one of these exit conditions is met: a signal file is detected, the maximum iteration count is reached, the process is interrupted by an OS signal, or three consecutive failures occur.
 3. When `max` is set to a positive integer, the engine runs at most that many iterations. When `max` is zero, iterations are unlimited.
-4. A command that exits with a non-zero status or fails to start counts as a failure. Three consecutive failures stop the engine with an error describing the failure streak.
+4. A command that exits with a non-zero status or fails to start counts as a failure. Three consecutive failures stop the engine with an error describing the failure streak. If the fail-streak limit and max-iterations limit are reached on the same iteration, fail-streak takes precedence.
 5. A successful iteration (exit code 0) resets the consecutive failure counter to zero.
 6. If the maximum iteration count is reached and the final iteration failed, the engine returns an error. If the final iteration succeeded, the engine returns successfully.
-7. Signal files are checked before spawning each iteration and after each iteration completes. Pre-existing signal files from a previous run are cleaned up and cause the engine to exit before the first iteration.
+7. Signal files are checked before spawning each iteration and after each iteration completes. Pre-existing signal files from a previous run are cleaned up and cause the engine to exit before the first iteration. The engine returns the corresponding stop reason for whichever signal file is present (signal-file-complete or signal-file-approval). If both are present, signal-file-approval takes precedence.
 8. Each iteration prints a header showing the iteration number and timestamp.
 9. The engine acquires an exclusive lock before starting and releases it on exit.
-10. When the engine stops, it communicates the stop reason to its caller. The stop reason distinguishes five cases: signal-file-complete, signal-file-approval, max-iterations-reached, fail-streak, and interrupted. The stop reason is not just an error -- successful exits (complete, approval, max-with-final-success) must also be distinguishable. For signal-file-approval, the stop reason includes the approval file contents read at detection time (before cleanup). This allows callers (such as notifications) to take reason-specific action without re-reading cleaned-up files.
+10. When the engine stops, it communicates the stop reason to its caller. The stop reason distinguishes five cases: signal-file-complete, signal-file-approval, max-iterations-reached, fail-streak, and interrupted. The "interrupted" reason covers both SIGINT (Ctrl+C) and SIGTERM exits. The stop reason is not just an error -- successful exits (complete, approval, max-with-final-success) must also be distinguishable. For signal-file-approval, the stop reason includes the approval file contents read at detection time (before cleanup). If the approval file cannot be read (per `signal-files.md` requirement 5), the approval content is an empty string. This allows callers (such as notifications) to take reason-specific action without re-reading cleaned-up files.
+11. All engine output (iteration headers, status messages, stop-reason messages) is written to stderr. Subprocess stdout passes through to the parent's stdout unmodified. This allows callers to pipe or capture agent output without brr's own diagnostics mixed in.
 
 ## Constraints
 
-- The engine must not leak child processes. All spawned processes must be cleaned up on exit regardless of how the engine stops.
+- The engine must not leak child processes. All spawned processes must be cleaned up on exit regardless of how the engine stops. Between iterations, the engine reaps any zombie child processes to prevent process table exhaustion during long runs.
 - Signal file cleanup must only remove regular files (not directories or symlinks).
 - The engine must work on Linux, macOS, and Windows.
 
@@ -41,5 +42,6 @@ The loop engine is the core orchestrator of brr. It repeatedly spawns a configur
 - [ ] Max reached with final failure returns an error.
 - [ ] Max reached with final success returns nil.
 - [x] Stop reason is reported for each exit condition (complete, approval, max, fail-streak, interrupted).
+- [ ] All engine output goes to stderr; agent stdout is not contaminated.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.

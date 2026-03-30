@@ -12,8 +12,8 @@ The CLI interface is the user-facing entry point to brr. It parses commands and 
 4. The `--version` flag prints the version string and exits. It does not require a prompt or a valid config.
 5. The `--notify` / `-n` flag enables desktop notifications on loop termination. Off by default.
 6. The `init` subcommand scaffolds a new brr project. It accepts a `--force` flag to overwrite existing files.
-7. On startup, brr prints an ASCII banner followed by a summary of the resolved configuration (profile name, command, max iterations).
-8. When the engine returns an interrupted error (from Ctrl+C), brr exits with code 130.
+7. On startup, brr prints an ASCII banner followed by a summary of the resolved configuration (profile name, command, max iterations). All CLI output (banner, config summary, status messages) is written to stderr so that stdout is reserved for agent output.
+8. When the engine returns an interrupted stop reason (from Ctrl+C or SIGTERM), brr exits with code 130.
 9. When the engine returns any other error, brr exits with code 1.
 10. On success, brr exits with code 0.
 
@@ -21,7 +21,7 @@ The CLI interface is the user-facing entry point to brr. It parses commands and 
 
 - Version and commit hash are injected at build time via linker flags; they must not be hardcoded.
 - The CLI must not import or depend on engine internals beyond the `engine.Run()` entry point.
-- Terminal colors are only emitted when stdout is a terminal.
+- Terminal colors are only emitted when stderr is a terminal.
 
 ## Dependencies
 
@@ -43,7 +43,8 @@ The CLI interface is the user-facing entry point to brr. It parses commands and 
 - [ ] Exit code is 130 on Ctrl+C interruption.
 - [ ] Exit code is 1 on engine error.
 - [ ] Exit code is 0 on success.
-- [ ] Banner and config summary are printed on startup.
-- [ ] Colors are suppressed when stdout is not a terminal.
+- [ ] Banner and config summary are printed to stderr on startup.
+- [ ] All CLI output goes to stderr; stdout is reserved for agent output.
+- [ ] Colors are suppressed when stderr is not a terminal.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.

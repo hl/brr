@@ -25,7 +25,8 @@ Project initialization (`brr init`) scaffolds the files and directories needed t
 
 ## Dependencies
 
-- Depends on `docs/specs/signal-files.md` for the list of runtime artifact file names added to `.gitignore`.
+- Depends on `docs/specs/signal-files.md` for signal file names (`.brr-complete`, `.brr-needs-approval`) added to `.gitignore`.
+- Depends on `docs/specs/concurrent-run-prevention.md` for the lock file name (`.brr.lock`) added to `.gitignore`.
 - Depends on `docs/specs/file-safety.md` for symlink rejection.
 
 ## Acceptance Criteria

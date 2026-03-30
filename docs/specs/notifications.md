@@ -14,18 +14,20 @@ and need a nudge when the loop ends and attention is required.
    - Too many consecutive failures (fail streak reaches the maximum)
    - Max iterations reached
 2. Each notification includes a title and body that identify which terminal
-   event occurred. The approval notification includes the content of the
-   `.brr-needs-approval` file (truncated to fit platform limits). If the
-   file cannot be read (per `signal-files.md` requirement 5), the notification
-   body states that approval is needed without file contents.
+   event occurred. The approval notification includes the approval file
+   contents carried in the engine's stop reason (read before signal file
+   cleanup per `loop-engine.md` requirement 10), truncated to fit platform
+   limits. If the engine could not read the file at detection time (per
+   `signal-files.md` requirement 5), the notification body states that
+   approval is needed without file contents.
 3. Notifications are enabled with `--notify` / `-n` flag. Off by default.
-4. When the terminal is not interactive (stdout is not a TTY), `--notify`
+4. When the terminal is not interactive (stderr is not a TTY), `--notify`
    is accepted but may silently no-op if the platform has no notification
    mechanism.
 5. Notification delivery is best-effort. A failure to send a notification
    must not affect the exit code or behaviour of the loop.
-6. User-interrupted stops (Ctrl+C) do not send a notification — the user is
-   already at the terminal.
+6. Interrupted stops (Ctrl+C or SIGTERM) do not send a notification — the
+   user is already at the terminal or the process is being managed externally.
 
 ## Constraints
 
@@ -33,8 +35,8 @@ and need a nudge when the loop ends and attention is required.
   and the Go standard library: `osascript` on macOS, `notify-send` on Linux.
   On Windows, notifications silently no-op (no OS mechanism available without
   external dependencies).
-- Notification dispatch must not delay engine shutdown. If the platform
-  mechanism is slow, it runs in the background.
+- Notification dispatch must not delay engine shutdown. Dispatch occurs
+  after the engine has stopped, so it does not block the engine itself.
 - The feature is a single concern: converting terminal events into OS
   notifications. It does not add sound, retry logic, webhook support, or
   custom notification commands. Those are separate specs if needed later.
