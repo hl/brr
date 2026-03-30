@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -212,6 +213,12 @@ func Run(opts Options) (*Result, error) {
 		mu.Lock()
 		currentCmd = nil
 		mu.Unlock()
+
+		// Clean up orphaned child processes (MCP servers, language servers, etc.)
+		// that outlive the agent process and would otherwise accumulate across iterations.
+		reapGroup(cmd)
+		cmd = nil //nolint:ineffassign // release cmd for GC before next iteration
+		debug.FreeOSMemory()
 
 		// Check for signal files immediately after subprocess exits
 		if sig := checkSignalFiles(); sig != nil {

@@ -20,6 +20,24 @@ func setProcAttr(cmd *exec.Cmd) {
 	}
 }
 
+// reapGroup cleans up any orphaned processes remaining in the child's process
+// tree after the child has exited. Uses taskkill /T /F to force-terminate
+// the entire tree.
+func reapGroup(cmd *exec.Cmd) {
+	if cmd.Process == nil {
+		return
+	}
+	pid := strconv.Itoa(cmd.Process.Pid)
+	var taskkill string
+	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
+		taskkill = filepath.Join(systemRoot, "System32", "taskkill.exe")
+	} else {
+		taskkill = "taskkill.exe"
+	}
+	kill := exec.Command(taskkill, "/T", "/F", "/PID", pid)
+	_ = kill.Run()
+}
+
 // killGroup sends a termination signal to the child process tree on Windows.
 // For SIGINT: attempts graceful tree kill via taskkill, then falls back to Process.Kill.
 // For SIGKILL/SIGTERM: uses taskkill /T /F to force-terminate the entire process tree.
