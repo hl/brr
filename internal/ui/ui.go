@@ -33,9 +33,3 @@ func init() {
 		Reset = ""
 	}
 }
-
-// Signal file paths used by the brr engine and prompts.
-const (
-	SignalComplete      = ".brr-complete"
-	SignalNeedsApproval = ".brr-needs-approval"
-)

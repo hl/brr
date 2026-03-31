@@ -1,12 +1,12 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,8 +21,14 @@ const maxApprovalFileSize = 4096
 
 const maxFailStreak = 3
 
+// Signal file paths used by the brr engine.
+const (
+	SignalComplete      = ".brr-complete"
+	SignalNeedsApproval = ".brr-needs-approval"
+)
+
 // ErrInterrupted is returned when the engine is stopped by a user signal (Ctrl+C).
-var ErrInterrupted = fmt.Errorf("interrupted")
+var ErrInterrupted = errors.New("interrupted")
 
 // StopReason indicates why the engine stopped.
 type StopReason int
@@ -66,18 +72,18 @@ func Run(opts Options) (*Result, error) {
 	// If signal files exist from a previous run, respect them immediately
 	if sig := checkSignalFiles(); sig != nil {
 		// Clean up the signal files so they don't block subsequent runs
-		removeIfRegular(ui.SignalComplete)
-		removeIfRegular(ui.SignalNeedsApproval)
+		removeIfRegular(SignalComplete)
+		removeIfRegular(SignalNeedsApproval)
 		return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
 	}
 
 	// Clean up stale signal files from previous runs
-	removeIfRegular(ui.SignalComplete)
-	removeIfRegular(ui.SignalNeedsApproval)
+	removeIfRegular(SignalComplete)
+	removeIfRegular(SignalNeedsApproval)
 
 	// Clean up signal files on exit (only regular files — never delete dirs/symlinks)
-	defer func() { removeIfRegular(ui.SignalComplete) }()
-	defer func() { removeIfRegular(ui.SignalNeedsApproval) }()
+	defer func() { removeIfRegular(SignalComplete) }()
+	defer func() { removeIfRegular(SignalNeedsApproval) }()
 
 	// Track the currently running subprocess so we can forward signals
 	var mu sync.Mutex
@@ -217,8 +223,6 @@ func Run(opts Options) (*Result, error) {
 		// Clean up orphaned child processes (MCP servers, language servers, etc.)
 		// that outlive the agent process and would otherwise accumulate across iterations.
 		reapGroup(cmd)
-		cmd = nil //nolint:ineffassign // release cmd for GC before next iteration
-		debug.FreeOSMemory()
 
 		// Check for signal files immediately after subprocess exits
 		if sig := checkSignalFiles(); sig != nil {
@@ -278,13 +282,13 @@ type signalResult struct {
 // Only regular files are treated as signals (symlinks and directories are ignored).
 // Returns nil if no signal file was found.
 func checkSignalFiles() *signalResult {
-	if fsutil.IsRegularFile(ui.SignalComplete) {
-		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, ui.SignalComplete)
+	if fsutil.IsRegularFile(SignalComplete) {
+		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, SignalComplete)
 		return &signalResult{reason: ReasonComplete}
 	}
 	// Try to open and read in one pass; fall back to existence check for unreadable files
-	if f, err := fsutil.OpenRegularFile(ui.SignalNeedsApproval); err == nil {
-		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
+	if f, err := fsutil.OpenRegularFile(SignalNeedsApproval); err == nil {
+		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
 		content, readErr := readCappedFromFile(f, maxApprovalFileSize)
 		_ = f.Close()
 		var approvalContent string
@@ -300,9 +304,9 @@ func checkSignalFiles() *signalResult {
 			fmt.Printf("  (could not read details: %v)\n", readErr)
 		}
 		return &signalResult{reason: ReasonApproval, approvalContent: approvalContent}
-	} else if fsutil.IsRegularFile(ui.SignalNeedsApproval) {
+	} else if fsutil.IsRegularFile(SignalNeedsApproval) {
 		// File exists but can't be opened (e.g. permissions) — still honor the signal
-		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, ui.SignalNeedsApproval)
+		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
 		fmt.Printf("  (could not read details: %v)\n", err)
 		return &signalResult{reason: ReasonApproval}
 	}

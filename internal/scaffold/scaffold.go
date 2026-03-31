@@ -39,7 +39,7 @@ func Init(force bool) error {
 
 	// Track whether prompts dir existed before we started (for rollback)
 	promptDir := filepath.Join(".brr", "prompts")
-	_, promptDirStatErr := os.Stat(promptDir)
+	_, promptDirStatErr := os.Lstat(promptDir)
 	promptDirIsNew := os.IsNotExist(promptDirStatErr)
 
 	// Stage 1: write .brr.yaml (re-verify no symlink swap before writing)

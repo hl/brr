@@ -6,8 +6,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/hl/brr/internal/ui"
 )
 
 func TestRunEmptyCommand(t *testing.T) {
@@ -93,7 +91,7 @@ func TestRunSignalFileComplete(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Create the signal file before running — engine should detect it before first iteration
-	if err := os.WriteFile(ui.SignalComplete, []byte("done"), 0o644); err != nil {
+	if err := os.WriteFile(SignalComplete, []byte("done"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +125,7 @@ func TestRunSignalFileComplete(t *testing.T) {
 func TestRunSignalFileNeedsApproval(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(ui.SignalNeedsApproval, []byte("please review"), 0o644); err != nil {
+	if err := os.WriteFile(SignalNeedsApproval, []byte("please review"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -165,7 +163,7 @@ func TestRunSignalFileCreatedByChild(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Child creates the signal file AND a counter — engine should stop after one iteration
-	signalPath := filepath.Join(".", ui.SignalComplete)
+	signalPath := filepath.Join(".", SignalComplete)
 	counter := filepath.Join(".", "iter-counter")
 
 	var cmd []string
@@ -254,7 +252,7 @@ func TestSignalFileDirNotDeletedOnCleanup(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Create a directory named .brr-complete — engine should NOT delete it
-	if err := os.Mkdir(ui.SignalComplete, 0o755); err != nil {
+	if err := os.Mkdir(SignalComplete, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -275,9 +273,9 @@ func TestSignalFileDirNotDeletedOnCleanup(t *testing.T) {
 	}
 
 	// Directory should still exist — removeIfRegular should have skipped it
-	fi, statErr := os.Stat(ui.SignalComplete)
+	fi, statErr := os.Stat(SignalComplete)
 	if statErr != nil {
-		t.Fatalf("directory %s was deleted by cleanup", ui.SignalComplete)
+		t.Fatalf("directory %s was deleted by cleanup", SignalComplete)
 	}
 	if !fi.IsDir() {
 		t.Error("expected .brr-complete to still be a directory")
@@ -295,7 +293,7 @@ func TestCheckSignalFilesNone(t *testing.T) {
 func TestCheckSignalFilesComplete(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(ui.SignalComplete, []byte(""), 0o644); err != nil {
+	if err := os.WriteFile(SignalComplete, []byte(""), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -311,7 +309,7 @@ func TestCheckSignalFilesComplete(t *testing.T) {
 func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(ui.SignalNeedsApproval, []byte("review this"), 0o644); err != nil {
+	if err := os.WriteFile(SignalNeedsApproval, []byte("review this"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -331,7 +329,7 @@ func TestCheckSignalFilesDirectoryIgnored(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// A directory named .brr-complete should NOT be treated as a signal file
-	if err := os.Mkdir(ui.SignalComplete, 0o755); err != nil {
+	if err := os.Mkdir(SignalComplete, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -348,7 +346,7 @@ func TestCheckSignalFilesSymlinkIgnored(t *testing.T) {
 	if err := os.WriteFile(target, []byte("done"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, ui.SignalComplete); err != nil {
+	if err := os.Symlink(target, SignalComplete); err != nil {
 		t.Skip("symlinks not supported")
 	}
 
@@ -361,14 +359,14 @@ func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Write-only file: Stat succeeds but ReadFile fails
-	if err := os.WriteFile(ui.SignalNeedsApproval, []byte("secret"), 0o200); err != nil {
+	if err := os.WriteFile(SignalNeedsApproval, []byte("secret"), 0o200); err != nil {
 		t.Fatal(err)
 	}
 	// Make it truly unreadable (not owner-writable-only, but no read)
-	if err := os.Chmod(ui.SignalNeedsApproval, 0o000); err != nil {
+	if err := os.Chmod(SignalNeedsApproval, 0o000); err != nil {
 		t.Skip("cannot remove read permission")
 	}
-	defer os.Chmod(ui.SignalNeedsApproval, 0o644)
+	defer os.Chmod(SignalNeedsApproval, 0o644)
 
 	sig := checkSignalFiles()
 	if sig == nil {
@@ -466,7 +464,7 @@ func TestRunSignalFileCleanedAfterEarlyStop(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Pre-existing signal file should be cleaned up after the engine returns
-	if err := os.WriteFile(ui.SignalComplete, []byte("done"), 0o644); err != nil {
+	if err := os.WriteFile(SignalComplete, []byte("done"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -488,7 +486,7 @@ func TestRunSignalFileCleanedAfterEarlyStop(t *testing.T) {
 	}
 
 	// Signal file should have been cleaned up
-	if _, err := os.Stat(ui.SignalComplete); err == nil {
+	if _, err := os.Stat(SignalComplete); err == nil {
 		t.Error("expected .brr-complete to be cleaned up after early stop")
 	}
 }
