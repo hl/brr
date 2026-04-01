@@ -87,6 +87,57 @@ func TestRunFailStreak(t *testing.T) {
 	}
 }
 
+func TestRunFailStreakDirtyTree(t *testing.T) {
+	tests := []struct {
+		name       string
+		dirty      bool
+		max        int
+		wantReason StopReason
+		wantIters  int
+	}{
+		{"dirty tree resets streak", true, 5, ReasonMaxIterations, 5},
+		{"clean tree counts toward streak", false, 10, ReasonFailStreak, maxFailStreak},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+
+			orig := gitTreeDirty
+			gitTreeDirty = func() bool { return tt.dirty }
+			t.Cleanup(func() { gitTreeDirty = orig })
+
+			counter := filepath.Join(".", "counter")
+			var cmd []string
+			if runtime.GOOS == "windows" {
+				cmd = []string{"cmd", "/c", "echo x >> " + counter + " & exit 1"}
+			} else {
+				cmd = []string{"sh", "-c", "echo x >> " + counter + " && exit 1"}
+			}
+
+			result, err := Run(Options{
+				Prompt:  "test",
+				Max:     tt.max,
+				Command: cmd,
+			})
+			if err == nil {
+				t.Fatal("expected error from failing iterations")
+			}
+			if result.Reason != tt.wantReason {
+				t.Errorf("expected reason %d, got %d", tt.wantReason, result.Reason)
+			}
+
+			data, readErr := os.ReadFile(counter)
+			if readErr != nil {
+				t.Fatal("counter file not created")
+			}
+			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+			if len(lines) != tt.wantIters {
+				t.Errorf("expected %d iterations, got %d", tt.wantIters, len(lines))
+			}
+		})
+	}
+}
+
 func TestRunSignalFileComplete(t *testing.T) {
 	t.Chdir(t.TempDir())
 

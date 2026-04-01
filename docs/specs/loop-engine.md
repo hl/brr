@@ -9,8 +9,8 @@ The loop engine is the core orchestrator of brr. It repeatedly spawns a configur
 1. The engine spawns the configured command once per iteration, piping the resolved prompt text to the subprocess's stdin.
 2. The engine runs iterations until one of these exit conditions is met: a signal file is detected, the maximum iteration count is reached, the process is interrupted by an OS signal, or three consecutive failures occur.
 3. When `max` is set to a positive integer, the engine runs at most that many iterations. When `max` is zero, iterations are unlimited.
-4. A command that exits with a non-zero status or fails to start counts as a failure. Three consecutive failures stop the engine with an error describing the failure streak. If the fail-streak limit and max-iterations limit are reached on the same iteration, fail-streak takes precedence.
-5. A successful iteration (exit code 0) resets the consecutive failure counter to zero.
+4. A command that exits with a non-zero status or fails to start counts as a failure — unless the git working tree is dirty after the exit, which indicates the agent made progress before crashing (e.g. context exhaustion, timeout). A dirty-tree failure resets the consecutive failure counter to zero instead of incrementing it. Three consecutive clean-tree failures stop the engine with an error describing the failure streak. If the fail-streak limit and max-iterations limit are reached on the same iteration, fail-streak takes precedence.
+5. A successful iteration (exit code 0) resets the consecutive failure counter to zero. A failed iteration with a dirty working tree also resets the counter (see requirement 4).
 6. If the maximum iteration count is reached and the final iteration failed, the engine returns an error. If the final iteration succeeded, the engine returns successfully.
 7. Signal files are checked before spawning each iteration and after each iteration completes. Pre-existing signal files from a previous run are cleaned up and cause the engine to exit before the first iteration. The engine returns the corresponding stop reason for whichever signal file is present (signal-file-complete or signal-file-approval). If both are present, signal-file-approval takes precedence.
 8. Each iteration prints a header showing the iteration number and timestamp.
@@ -35,8 +35,9 @@ The loop engine is the core orchestrator of brr. It repeatedly spawns a configur
 
 - [ ] Engine runs the correct number of iterations when max is set.
 - [ ] Engine runs indefinitely when max is zero (until another exit condition).
-- [ ] Three consecutive failures stop the engine with an error.
+- [ ] Three consecutive clean-tree failures stop the engine with an error.
 - [ ] A success after failures resets the failure counter.
+- [ ] A dirty-tree failure resets the failure counter (crash with progress).
 - [ ] Signal files created during an iteration stop the engine after that iteration.
 - [ ] Pre-existing signal files cause immediate exit before the first iteration.
 - [ ] Max reached with final failure returns an error.

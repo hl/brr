@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Crash with dirty working tree no longer counts toward the consecutive failure streak — agents that make progress before dying (context exhaustion, timeout) are retried instead of stopped
+
 ## [0.2.1] "Read the Signs" - 2026-03-29
 
 ### Changed

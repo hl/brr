@@ -17,6 +17,13 @@ import (
 	"github.com/hl/brr/internal/ui"
 )
 
+// gitTreeDirty reports whether the git working tree has uncommitted changes.
+// Returns false if git is not available or the directory is not a repository.
+var gitTreeDirty = func() bool {
+	out, err := exec.Command("git", "status", "--porcelain").Output()
+	return err == nil && len(strings.TrimSpace(string(out))) > 0
+}
+
 const maxApprovalFileSize = 4096
 
 const maxFailStreak = 3
@@ -236,18 +243,28 @@ func Run(opts Options) (*Result, error) {
 		}
 
 		if err != nil {
-			failStreak++
 			lastErr = err
 			rc := 1
 			if exitErr, ok := err.(*exec.ExitError); ok {
 				rc = exitErr.ExitCode()
 			}
-			fmt.Printf("  %s%s✗ Iteration %d failed%s (exit %d). Consecutive failures: %d/%d\n",
-				ui.Bold, ui.Red, iterNum, ui.Reset, rc, failStreak, maxFailStreak,
-			)
-			if failStreak >= maxFailStreak {
-				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
-				return &Result{Reason: ReasonFailStreak}, fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
+			// If the working tree is dirty, the agent made progress before crashing
+			// (e.g. context exhaustion, timeout). Don't count it toward the fail streak —
+			// the next iteration's recovery phase will pick up where it left off.
+			if gitTreeDirty() {
+				failStreak = 0
+				fmt.Printf("  %s%s⟳ Iteration %d crashed%s (exit %d) — dirty tree detected, progress was made. Retrying.\n",
+					ui.Bold, ui.Yellow, iterNum, ui.Reset, rc,
+				)
+			} else {
+				failStreak++
+				fmt.Printf("  %s%s✗ Iteration %d failed%s (exit %d). Consecutive failures: %d/%d\n",
+					ui.Bold, ui.Red, iterNum, ui.Reset, rc, failStreak, maxFailStreak,
+				)
+				if failStreak >= maxFailStreak {
+					fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
+					return &Result{Reason: ReasonFailStreak}, fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
+				}
 			}
 		} else {
 			failStreak = 0
