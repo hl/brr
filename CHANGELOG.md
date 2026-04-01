@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
+## [0.2.2] "Still Warm" - 2026-04-01
+
+### Fixed
 
 - Crash with dirty working tree no longer counts toward the consecutive failure streak — agents that make progress before dying (context exhaustion, timeout) are retried instead of stopped
+- Orphaned child processes (MCP servers, language servers) are now reaped between iterations to prevent process table exhaustion during long runs
 
 ## [0.2.1] "Read the Signs" - 2026-03-29
 
