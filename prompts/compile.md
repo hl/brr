@@ -4,7 +4,7 @@ Everything runs in this single session. You are the orchestrator, planner, and i
 
 ## Phase 0: Precondition
 
-1. Delete stale signal files: `rm -f .brr-complete .brr-needs-approval`
+1. Check for previous completion: if `.brr-complete` exists, this is a re-run. Note this, then delete stale signal files: `rm -f .brr-complete .brr-needs-approval`. If a re-run was detected and `COMPILE.md` exists, rewrite `COMPILE.md` keeping only the `## Guardrails` section (drop `## Spec Queue` and `## Completed`). This causes Phase 1 to route to Phase 2, which rebuilds the queue from scratch while preserving learned patterns.
 2. Read `AGENTS.md`. If `CLAUDE.md` exists, read it too. These define quality gates, spec directory, commit format, conventions, and decision authority. All project-specific behavior comes from these files — follow them exactly. If `AGENTS.md` does not exist, create `.brr-needs-approval` with "No AGENTS.md found — cannot determine project conventions" and exit.
 3. Run `git status --porcelain -- .`.
    - If `COMPILE.md` has uncommitted changes: stage and commit with `docs(compile): recover uncommitted state`.
