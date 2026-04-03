@@ -133,7 +133,7 @@ var gitignoreEntries = []string{
 	".brr-complete",
 	".brr-needs-approval",
 	".brr.lock",
-	"COMPILE.md",
+	"/COMPILE.md",
 }
 
 // updateGitignore appends missing brr entries to .gitignore.
