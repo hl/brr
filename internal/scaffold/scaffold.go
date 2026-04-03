@@ -204,10 +204,6 @@ profiles:
     command: claude
     args: [-p, --dangerously-skip-permissions, --model, opus, --max-turns, "200"]
 
-  compile:
-    command: claude
-    args: [-p, --dangerously-skip-permissions, --model, opus, --max-turns, "500"]
-
   codex:
     command: codex
     args: [exec, --ephemeral, --dangerously-bypass-approvals-and-sandbox, --model, gpt-5.4, -]
