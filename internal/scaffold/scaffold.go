@@ -133,6 +133,7 @@ var gitignoreEntries = []string{
 	".brr-complete",
 	".brr-needs-approval",
 	".brr.lock",
+	"COMPILE.md",
 }
 
 // updateGitignore appends missing brr entries to .gitignore.
@@ -203,6 +204,10 @@ profiles:
   opus:
     command: claude
     args: [-p, --dangerously-skip-permissions, --model, opus, --max-turns, "200"]
+
+  compile:
+    command: claude
+    args: [-p, --dangerously-skip-permissions, --model, opus, --max-turns, "500"]
 
   codex:
     command: codex

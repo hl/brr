@@ -41,7 +41,7 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		t.Fatal("expected .gitignore to exist")
 	}
-	for _, entry := range []string{".brr-complete", ".brr-needs-approval"} {
+	for _, entry := range []string{".brr-complete", ".brr-needs-approval", "COMPILE.md"} {
 		if !strings.Contains(string(gitignore), entry) {
 			t.Errorf("expected %q in .gitignore", entry)
 		}
@@ -78,7 +78,7 @@ func TestInitGitignoreAppendsToExisting(t *testing.T) {
 func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n.brr.lock\n"), 0o644); err != nil {
+	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n.brr.lock\nCOMPILE.md\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
