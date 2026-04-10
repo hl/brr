@@ -1,0 +1,28 @@
+# Full development workflow: requirements -> verified, reviewed code.
+#
+# Usage:
+#   brr workflow ship
+#
+# Prerequisite: create REQUIREMENTS.md with your feature description.
+#
+# Pipeline: spec -> plan -> build -> verify -> review
+# If verify or review find issues, cycles back to build (up to max_cycles).
+
+stages:
+  - prompt: spec
+    max: 3
+
+  - prompt: plan
+    max: 5
+
+  - prompt: build
+    max: 100
+    cycle: true
+
+  - prompt: verify
+    max: 3
+
+  - prompt: review
+    max: 1
+
+max_cycles: 3

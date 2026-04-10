@@ -22,7 +22,7 @@ const (
 	lockfileFailImmediately = 0x01
 )
 
-func acquireLock() (*os.File, error) {
+func AcquireLock() (*os.File, error) {
 	f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("creating lock file: %w", err)
@@ -50,7 +50,7 @@ func acquireLock() (*os.File, error) {
 // releaseLock releases the advisory lock and closes the file handle.
 // The lock file is intentionally kept on disk to prevent a race where
 // another process acquires the old handle just before it is deleted.
-func releaseLock(f *os.File) {
+func ReleaseLock(f *os.File) {
 	h := syscall.Handle(f.Fd())
 	ol := new(syscall.Overlapped)
 	_, _, _ = procUnlockFileEx.Call(

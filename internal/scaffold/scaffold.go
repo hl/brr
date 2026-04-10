@@ -26,21 +26,25 @@ func Init(force bool) error {
 	}
 
 	// Backup for rollback — abort if file exists but can't be read (can't guarantee restore)
-	var existingYAML []byte
-	var existingMode os.FileMode
+	rb := rollbackState{
+		promptDir:   filepath.Join(".brr", "prompts"),
+		workflowDir: filepath.Join(".brr", "workflows"),
+	}
 	if yamlExists {
 		data, err := os.ReadFile(".brr.yaml")
 		if err != nil {
 			return fmt.Errorf("cannot back up .brr.yaml for rollback: %w", err)
 		}
-		existingYAML = data
-		existingMode = yamlInfo.Mode().Perm()
+		rb.yamlData = data
+		rb.yamlMode = yamlInfo.Mode().Perm()
+		rb.yamlExisted = true
 	}
 
-	// Track whether prompts dir existed before we started (for rollback)
-	promptDir := filepath.Join(".brr", "prompts")
-	_, promptDirStatErr := os.Lstat(promptDir)
-	promptDirIsNew := os.IsNotExist(promptDirStatErr)
+	// Track whether dirs existed before we started (for rollback)
+	_, promptDirStatErr := os.Lstat(rb.promptDir)
+	rb.promptDirIsNew = os.IsNotExist(promptDirStatErr)
+	_, workflowDirStatErr := os.Lstat(rb.workflowDir)
+	rb.workflowDirIsNew = os.IsNotExist(workflowDirStatErr)
 
 	// Stage 1: write .brr.yaml (re-verify no symlink swap before writing)
 	if err := rejectSymlink(".brr.yaml"); err != nil {
@@ -50,26 +54,30 @@ func Init(force bool) error {
 		return err
 	}
 
-	// Stage 2: create .brr/prompts/
-	if err := os.MkdirAll(promptDir, 0o755); err != nil {
-		if rErr := restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists); rErr != nil {
+	// Stage 2: create .brr/prompts/ and .brr/workflows/
+	if err := os.MkdirAll(rb.promptDir, 0o755); err != nil {
+		if rErr := restoreFile(".brr.yaml", rb.yamlData, rb.yamlMode, rb.yamlExisted); rErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
 		}
+		return err
+	}
+	if err := os.MkdirAll(rb.workflowDir, 0o755); err != nil {
+		rb.rollback()
 		return err
 	}
 
 	// Stage 3: update .gitignore (re-verify no symlink swap)
 	if err := rejectSymlink(".gitignore"); err != nil {
-		rollbackInit(existingYAML, existingMode, yamlExists, promptDirIsNew, promptDir)
+		rb.rollback()
 		return err
 	}
 	gitignoreUpdated, err := updateGitignore()
 	if err != nil {
-		rollbackInit(existingYAML, existingMode, yamlExists, promptDirIsNew, promptDir)
+		rb.rollback()
 		return fmt.Errorf("updating .gitignore: %w", err)
 	}
 
-	created := []string{".brr.yaml", ".brr/prompts/"}
+	created := []string{".brr.yaml", ".brr/prompts/", ".brr/workflows/"}
 	if gitignoreUpdated {
 		created = append(created, ".gitignore (updated)")
 	}
@@ -80,23 +88,35 @@ func Init(force bool) error {
 	}
 	fmt.Println()
 	fmt.Println("  Next steps:")
-	fmt.Println("    1. Add prompts to .brr/prompts/ (e.g. plan.md, build.md)")
-	fmt.Println("    2. Run them: brr plan  →  resolves to .brr/prompts/plan.md")
+	fmt.Println("    1. Copy prompts to .brr/prompts/ (examples: https://github.com/hl/brr/tree/main/prompts)")
+	fmt.Println("    2. Copy workflows to .brr/workflows/ (example: prompts/workflows/ship.yaml)")
+	fmt.Println("    3. Run them: brr plan  or  brr workflow ship")
 	fmt.Println()
-	fmt.Println("  Examples:  https://github.com/hl/brr/tree/main/prompts")
-	fmt.Println("  AGENTS.md: https://github.com/hl/brr/blob/main/AGENTS.md")
+	fmt.Println("  Docs: https://github.com/hl/brr")
 
 	return nil
 }
 
-// rollbackInit undoes partial Init work, logging any rollback failures.
-func rollbackInit(existingYAML []byte, existingMode os.FileMode, yamlExists, promptDirIsNew bool, promptDir string) {
-	if rErr := restoreFile(".brr.yaml", existingYAML, existingMode, yamlExists); rErr != nil {
+type rollbackState struct {
+	yamlData         []byte
+	yamlMode         os.FileMode
+	yamlExisted      bool
+	promptDir        string
+	promptDirIsNew   bool
+	workflowDir      string
+	workflowDirIsNew bool
+}
+
+func (rb *rollbackState) rollback() {
+	if rErr := restoreFile(".brr.yaml", rb.yamlData, rb.yamlMode, rb.yamlExisted); rErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
 	}
-	if promptDirIsNew {
-		_ = os.Remove(promptDir)               // .brr/prompts/
-		_ = os.Remove(filepath.Dir(promptDir)) // .brr/ (only succeeds if empty)
+	if rb.workflowDirIsNew {
+		_ = os.Remove(rb.workflowDir)
+	}
+	if rb.promptDirIsNew {
+		_ = os.Remove(rb.promptDir)
+		_ = os.Remove(filepath.Dir(rb.promptDir)) // .brr/ (only succeeds if empty)
 	}
 }
 
@@ -133,6 +153,7 @@ var gitignoreEntries = []string{
 	".brr-complete",
 	".brr-needs-approval",
 	".brr.lock",
+	".brr-workflow-state.json",
 }
 
 // updateGitignore appends missing brr entries to .gitignore.

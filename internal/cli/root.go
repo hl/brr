@@ -25,16 +25,18 @@ var rootCmd = &cobra.Command{
 	Long: `brr runs a prompt in a loop, spinning up a fresh session for each iteration.
 
 Signal Files:
-  .brr-complete        The agent creates this file when all work is finished.
-                       brr detects it, stops the loop, and removes the file.
+  .brr-complete              The agent creates this when all work is finished.
+                             brr stops the loop and removes the file.
 
-  .brr-needs-approval  The agent creates this file when it needs a human decision.
-                       brr stops the loop and prints the file contents (up to 4 KiB)
-                       so you can see what the agent is asking about.
+  .brr-needs-approval        The agent creates this when it needs a human decision.
+                             brr stops and prints the file contents (up to 4 KiB).
 
-  .brr.lock            Prevents multiple brr instances from running in the same directory.
-                       Acquired automatically on start, released on exit.
-                       The file stays on disk between runs — this is intentional.`,
+  .brr.lock                  Prevents concurrent brr instances in the same directory.
+                             Acquired on start, released on exit. Stays on disk.
+
+  .brr-workflow-state.json   Tracks workflow progress for resume. Written by
+                             'brr workflow' after each stage. Deleted on completion.
+                             Use --reset to discard and start fresh.`,
 	Args:         cobra.ExactArgs(1),
 	RunE:         run,
 	SilenceUsage: true,

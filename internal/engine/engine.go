@@ -56,9 +56,10 @@ type Result struct {
 
 // Options configures a loop run.
 type Options struct {
-	Prompt  string   // resolved prompt text
-	Max     int      // max iterations (0 = unlimited)
-	Command []string // command + args to run (prompt piped to stdin)
+	Prompt   string   // resolved prompt text
+	Max      int      // max iterations (0 = unlimited)
+	Command  []string // command + args to run (prompt piped to stdin)
+	SkipLock bool     // skip lock acquisition (caller holds the lock)
 }
 
 // Run executes the loop until completion, max iterations, or interrupt.
@@ -70,11 +71,13 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// Prevent concurrent brr runs in the same directory
-	lf, err := acquireLock()
-	if err != nil {
-		return nil, err
+	if !opts.SkipLock {
+		lf, err := AcquireLock()
+		if err != nil {
+			return nil, err
+		}
+		defer ReleaseLock(lf)
 	}
-	defer releaseLock(lf)
 
 	// If signal files exist from a previous run, respect them immediately
 	if sig := checkSignalFiles(); sig != nil {

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `brr workflow <name>` command — orchestrates multi-stage pipelines defined in `.brr/workflows/<name>.yaml`, with sequential stage execution, per-stage profile overrides, and automatic cycle-back when verify/review stages find issues
+- New prompts: `spec` (requirements to structured spec), `verify` (check implementation against acceptance criteria), `review` (autonomous code review of recent changes)
+- Example `ship` workflow: spec → plan → build → verify → review with up to 3 fix cycles
+- Workflow resume: progress is saved to `.brr-workflow-state.json` after each stage — interrupted or paused workflows resume from the last checkpoint on re-run (`--reset` to start fresh)
+- `brr init` now scaffolds `.brr/workflows/` directory
+
 ## [0.2.2] "Still Warm" - 2026-04-01
 
 ### Fixed

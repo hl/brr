@@ -31,6 +31,11 @@ func TestInit(t *testing.T) {
 		t.Error("expected .brr/prompts/ to exist")
 	}
 
+	// Check .brr/workflows/ directory was created
+	if _, err := os.Stat(filepath.Join(".brr", "workflows")); err != nil {
+		t.Error("expected .brr/workflows/ to exist")
+	}
+
 	// AGENTS.md should not be created
 	if _, err := os.Stat("AGENTS.md"); err == nil {
 		t.Error("expected AGENTS.md to not be created by init")
@@ -78,7 +83,7 @@ func TestInitGitignoreAppendsToExisting(t *testing.T) {
 func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n.brr.lock\n"), 0o644); err != nil {
+	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-needs-approval\n.brr.lock\n.brr-workflow-state.json\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
