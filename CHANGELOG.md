@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] "Pipes Not Words" - 2026-04-10
+
 ### Added
 
 - `brr workflow <name>` command — orchestrates multi-stage pipelines defined in `.brr/workflows/<name>.yaml`, with sequential stage execution, per-stage profile overrides, and automatic cycle-back when verify/review stages find issues
@@ -14,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Example `ship` workflow: spec → plan → build → verify → review with up to 3 fix cycles
 - Workflow resume: progress is saved to `.brr-workflow-state.json` after each stage — interrupted or paused workflows resume from the last checkpoint on re-run (`--reset` to start fresh)
 - `brr init` now scaffolds `.brr/workflows/` directory
+
+### Fixed
+
+- All brr output now writes to stderr, keeping stdout clean for agent piping and composition
+- `brr init` no longer gitignores `COMPILE.md` files outside the repo root
 
 ## [0.2.2] "Still Warm" - 2026-04-01
 
