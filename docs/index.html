@@ -18,6 +18,7 @@
           <a href="#install">Install</a>
           <a href="#usage">Usage</a>
           <a href="#profiles">Profiles</a>
+          <a href="#workflows">Workflows</a>
           <a href="#signals">Signals</a>
           <a href="https://github.com/hl/brr">GitHub</a>
         </nav>
@@ -80,7 +81,8 @@ brr [command]</code></pre>
                 <p class="heading">Available Commands</p>
                 <pre><code>completion  Generate the autocompletion script
 help        Help about any command
-init        Scaffold a project for brr</code></pre>
+init        Scaffold a project for brr
+workflow    Run a multi-stage workflow</code></pre>
               </div>
               <div class="help-panel">
                 <p class="heading">Flags</p>
@@ -95,7 +97,7 @@ init        Scaffold a project for brr</code></pre>
 
           <section class="terminal-block">
             <p class="section-kicker">$ examples</p>
-            <div class="inline-grid inline-grid-2">
+            <div class="inline-grid inline-grid-3">
               <div class="inline-card">
                 <p class="label">run a prompt file</p>
                 <pre><code>brr prompts/build.md --max 20</code></pre>
@@ -111,6 +113,14 @@ init        Scaffold a project for brr</code></pre>
               <div class="inline-card">
                 <p class="label">notify when done</p>
                 <pre><code>brr build --max 20 --notify</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">run a workflow</p>
+                <pre><code>brr workflow ship</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">restart a workflow</p>
+                <pre><code>brr workflow ship --reset</code></pre>
               </div>
             </div>
           </section>
@@ -145,6 +155,37 @@ profiles:
             </div>
           </section>
 
+          <section class="terminal-block" id="workflows">
+            <p class="section-kicker">$ cat .brr/workflows/ship.yaml</p>
+            <div class="config-layout">
+              <div class="copy-block">
+                <p>
+                  Workflows chain multiple loop stages into a pipeline. Each stage runs with its
+                  own prompt and iteration limit. When a later stage (verify, review) finds issues,
+                  the workflow cycles back to the build stage automatically.
+                </p>
+                <p>
+                  Progress is saved to <code>.brr-workflow-state.json</code> after each stage.
+                  Interrupted workflows resume from where they left off. Use <code>--reset</code>
+                  to start fresh.
+                </p>
+              </div>
+              <pre class="config-block"><code>stages:
+  - prompt: spec       # requirements -> spec
+    max: 3
+  - prompt: plan       # spec -> implementation plan
+    max: 5
+  - prompt: build      # implement one task per iteration
+    max: 100
+    cycle: true        # restart here if later stages find issues
+  - prompt: verify     # check against acceptance criteria
+    max: 3
+  - prompt: review     # audit changes for correctness
+    max: 1
+max_cycles: 3</code></pre>
+            </div>
+          </section>
+
           <section class="terminal-block" id="signals">
             <p class="section-kicker">$ ls -a .brr*</p>
             <div class="signal-list">
@@ -170,6 +211,14 @@ profiles:
                   Prevents multiple brr instances from running in the same directory at the same
                   time. Acquired automatically on start, released on exit. The file stays on disk
                   between runs — this is intentional. Added to .gitignore by <code>brr init</code>.
+                </p>
+              </div>
+              <div class="signal-item">
+                <p class="signal-name">.brr-workflow-state.json</p>
+                <p>
+                  Tracks workflow progress for resume. Written by <code>brr workflow</code> after
+                  each stage. Deleted on completion. Use <code>--reset</code> to discard and start
+                  fresh. Added to .gitignore by <code>brr init</code>.
                 </p>
               </div>
               <div class="signal-item">
