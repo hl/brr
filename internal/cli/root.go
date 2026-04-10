@@ -51,7 +51,7 @@ func init() {
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !cmd.HasParent() {
 			printBanner()
-			fmt.Printf("  %shttps://github.com/hl/brr%s\n\n", ui.Dim, ui.Reset)
+			fmt.Fprintf(os.Stderr, "  %shttps://github.com/hl/brr%s\n\n", ui.Dim, ui.Reset)
 		}
 		defaultHelp(cmd, args)
 	})
@@ -198,15 +198,15 @@ func isPromptExtension(ext string) bool {
 }
 
 func printBanner() {
-	fmt.Println()
-	fmt.Printf("  %s%s██████╗ ██████╗ ██████╗%s\n", ui.Bold, ui.Cyan, ui.Reset)
-	fmt.Printf("  %s%s██╔══██╗██╔══██╗██╔══██╗%s\n", ui.Bold, ui.Blue, ui.Reset)
-	fmt.Printf("  %s%s██████╔╝██████╔╝██████╔╝%s\n", ui.Bold, ui.Magenta, ui.Reset)
-	fmt.Printf("  %s%s██╔══██╗██╔══██╗██╔══██╗%s\n", ui.Bold, ui.Red, ui.Reset)
-	fmt.Printf("  %s%s██████╔╝██║  ██║██║  ██║%s\n", ui.Bold, ui.Yellow, ui.Reset)
-	fmt.Printf("  %s%s╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝%s\n", ui.Bold, ui.Green, ui.Reset)
-	fmt.Printf("  %syour AI agent, but unhinged%s\n", ui.Dim, ui.Reset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "  %s%s██████╗ ██████╗ ██████╗%s\n", ui.Bold, ui.Cyan, ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %s%s██╔══██╗██╔══██╗██╔══██╗%s\n", ui.Bold, ui.Blue, ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %s%s██████╔╝██████╔╝██████╔╝%s\n", ui.Bold, ui.Magenta, ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %s%s██╔══██╗██╔══██╗██╔══██╗%s\n", ui.Bold, ui.Red, ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %s%s██████╔╝██║  ██║██║  ██║%s\n", ui.Bold, ui.Yellow, ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %s%s╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝%s\n", ui.Bold, ui.Green, ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %syour AI agent, but unhinged%s\n", ui.Dim, ui.Reset)
+	fmt.Fprintln(os.Stderr)
 }
 
 func printConfig(promptName string, profileName string, command []string, max int) {
@@ -214,10 +214,10 @@ func printConfig(promptName string, profileName string, command []string, max in
 	if max > 0 {
 		maxLabel = fmt.Sprintf("%d", max)
 	}
-	fmt.Printf("  %sprompt:%s  %s\n", ui.Dim, ui.Reset, promptName)
-	fmt.Printf("  %sprofile:%s %s %s(%s)%s\n", ui.Dim, ui.Reset, profileName, ui.Dim, command[0], ui.Reset)
-	fmt.Printf("  %smax:%s     %s\n", ui.Dim, ui.Reset, maxLabel)
-	fmt.Println()
+	fmt.Fprintf(os.Stderr, "  %sprompt:%s  %s\n", ui.Dim, ui.Reset, promptName)
+	fmt.Fprintf(os.Stderr, "  %sprofile:%s %s %s(%s)%s\n", ui.Dim, ui.Reset, profileName, ui.Dim, command[0], ui.Reset)
+	fmt.Fprintf(os.Stderr, "  %smax:%s     %s\n", ui.Dim, ui.Reset, maxLabel)
+	fmt.Fprintln(os.Stderr)
 }
 
 // Execute runs the root command.

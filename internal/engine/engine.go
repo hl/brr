@@ -130,7 +130,7 @@ func Run(opts Options) (*Result, error) {
 							fmt.Fprintf(os.Stderr, "warning: failed to forward SIGTERM to child: %v\n", err)
 						}
 					}
-					fmt.Printf("\n  %s%s⏳ SIGTERM received, forwarding to child...%s\n",
+					fmt.Fprintf(os.Stderr, "\n  %s%s⏳ SIGTERM received, forwarding to child...%s\n",
 						ui.Bold, ui.Yellow, ui.Reset)
 					continue
 				}
@@ -139,7 +139,7 @@ func Run(opts Options) (*Result, error) {
 				switch n {
 				case 1:
 					stopping.Store(true)
-					fmt.Printf("\n  %s%s⏳ Finishing current iteration...%s (Ctrl+C again to interrupt now)\n",
+					fmt.Fprintf(os.Stderr, "\n  %s%s⏳ Finishing current iteration...%s (Ctrl+C again to interrupt now)\n",
 						ui.Bold, ui.Yellow, ui.Reset)
 				case 2:
 					mu.Lock()
@@ -172,7 +172,7 @@ func Run(opts Options) (*Result, error) {
 	for opts.Max == 0 || i < opts.Max {
 		// Check if user requested stop (first Ctrl+C) between iterations
 		if stopping.Load() {
-			fmt.Printf("\n  %s%sStopped%s.\n", ui.Bold, ui.Yellow, ui.Reset)
+			fmt.Fprintf(os.Stderr, "\n  %s%sStopped%s.\n", ui.Bold, ui.Yellow, ui.Reset)
 			return &Result{Reason: ReasonInterrupted}, ErrInterrupted
 		}
 
@@ -186,7 +186,7 @@ func Run(opts Options) (*Result, error) {
 		if opts.Max > 0 {
 			maxLabel = fmt.Sprintf("/%d", opts.Max)
 		}
-		fmt.Printf("\n%s━━━%s %s%sIteration %d%s%s %s▸ %s ━━━%s\n",
+		fmt.Fprintf(os.Stderr, "\n%s━━━%s %s%sIteration %d%s%s %s▸ %s ━━━%s\n",
 			ui.Dim, ui.Reset,
 			ui.Bold, ui.Cyan, iterNum, maxLabel, ui.Reset,
 			ui.Dim, time.Now().Format("15:04:05"), ui.Reset,
@@ -209,11 +209,11 @@ func Run(opts Options) (*Result, error) {
 			// Start failure counts as iteration failure
 			failStreak++
 			lastErr = err
-			fmt.Printf("  %s%s✗ Iteration %d failed to start%s: %v. Consecutive failures: %d/%d\n",
+			fmt.Fprintf(os.Stderr, "  %s%s✗ Iteration %d failed to start%s: %v. Consecutive failures: %d/%d\n",
 				ui.Bold, ui.Red, iterNum, ui.Reset, err, failStreak, maxFailStreak,
 			)
 			if failStreak >= maxFailStreak {
-				fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
+				fmt.Fprintf(os.Stderr, "  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
 				return &Result{Reason: ReasonFailStreak}, fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
 			}
 			i++
@@ -241,7 +241,7 @@ func Run(opts Options) (*Result, error) {
 
 		// If user requested stop (first Ctrl+C), exit gracefully now that the iteration is done
 		if stopping.Load() {
-			fmt.Printf("\n  %s%sStopped after iteration %d%s.\n", ui.Bold, ui.Yellow, iterNum, ui.Reset)
+			fmt.Fprintf(os.Stderr, "\n  %s%sStopped after iteration %d%s.\n", ui.Bold, ui.Yellow, iterNum, ui.Reset)
 			return &Result{Reason: ReasonInterrupted}, ErrInterrupted
 		}
 
@@ -256,16 +256,16 @@ func Run(opts Options) (*Result, error) {
 			// the next iteration's recovery phase will pick up where it left off.
 			if gitTreeDirty() {
 				failStreak = 0
-				fmt.Printf("  %s%s⟳ Iteration %d crashed%s (exit %d) — dirty tree detected, progress was made. Retrying.\n",
+				fmt.Fprintf(os.Stderr, "  %s%s⟳ Iteration %d crashed%s (exit %d) — dirty tree detected, progress was made. Retrying.\n",
 					ui.Bold, ui.Yellow, iterNum, ui.Reset, rc,
 				)
 			} else {
 				failStreak++
-				fmt.Printf("  %s%s✗ Iteration %d failed%s (exit %d). Consecutive failures: %d/%d\n",
+				fmt.Fprintf(os.Stderr, "  %s%s✗ Iteration %d failed%s (exit %d). Consecutive failures: %d/%d\n",
 					ui.Bold, ui.Red, iterNum, ui.Reset, rc, failStreak, maxFailStreak,
 				)
 				if failStreak >= maxFailStreak {
-					fmt.Printf("  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
+					fmt.Fprintf(os.Stderr, "  %s%s✗ Too many consecutive failures. Stopping.%s\n", ui.Bold, ui.Red, ui.Reset)
 					return &Result{Reason: ReasonFailStreak}, fmt.Errorf("stopped after %d consecutive failures: %w", maxFailStreak, lastErr)
 				}
 			}
@@ -303,31 +303,31 @@ type signalResult struct {
 // Returns nil if no signal file was found.
 func checkSignalFiles() *signalResult {
 	if fsutil.IsRegularFile(SignalComplete) {
-		fmt.Printf("\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, SignalComplete)
+		fmt.Fprintf(os.Stderr, "\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, SignalComplete)
 		return &signalResult{reason: ReasonComplete}
 	}
 	// Try to open and read in one pass; fall back to existence check for unreadable files
 	if f, err := fsutil.OpenRegularFile(SignalNeedsApproval); err == nil {
-		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
+		fmt.Fprintf(os.Stderr, "\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
 		content, readErr := readCappedFromFile(f, maxApprovalFileSize)
 		_ = f.Close()
 		var approvalContent string
 		if readErr == nil {
 			trimmed := strings.TrimSpace(content)
 			if trimmed != "" {
-				fmt.Println(trimmed)
+				fmt.Fprintln(os.Stderr, trimmed)
 				approvalContent = trimmed
 			} else {
-				fmt.Println("  (no details provided)")
+				fmt.Fprintln(os.Stderr, "  (no details provided)")
 			}
 		} else {
-			fmt.Printf("  (could not read details: %v)\n", readErr)
+			fmt.Fprintf(os.Stderr, "  (could not read details: %v)\n", readErr)
 		}
 		return &signalResult{reason: ReasonApproval, approvalContent: approvalContent}
 	} else if fsutil.IsRegularFile(SignalNeedsApproval) {
 		// File exists but can't be opened (e.g. permissions) — still honor the signal
-		fmt.Printf("\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
-		fmt.Printf("  (could not read details: %v)\n", err)
+		fmt.Fprintf(os.Stderr, "\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
+		fmt.Fprintf(os.Stderr, "  (could not read details: %v)\n", err)
 		return &signalResult{reason: ReasonApproval}
 	}
 	return nil

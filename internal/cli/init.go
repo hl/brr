@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/hl/brr/internal/scaffold"
 	"github.com/spf13/cobra"
@@ -26,6 +27,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("reading --force flag: %w", err)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	return scaffold.Init(force)
 }

@@ -82,17 +82,17 @@ func Init(force bool) error {
 		created = append(created, ".gitignore (updated)")
 	}
 
-	fmt.Printf("  Created:\n")
+	fmt.Fprintf(os.Stderr, "  Created:\n")
 	for _, f := range created {
-		fmt.Printf("    %s\n", f)
+		fmt.Fprintf(os.Stderr, "    %s\n", f)
 	}
-	fmt.Println()
-	fmt.Println("  Next steps:")
-	fmt.Println("    1. Copy prompts to .brr/prompts/ (examples: https://github.com/hl/brr/tree/main/prompts)")
-	fmt.Println("    2. Copy workflows to .brr/workflows/ (example: prompts/workflows/ship.yaml)")
-	fmt.Println("    3. Run them: brr plan  or  brr workflow ship")
-	fmt.Println()
-	fmt.Println("  Docs: https://github.com/hl/brr")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "  Next steps:")
+	fmt.Fprintln(os.Stderr, "    1. Copy prompts to .brr/prompts/ (examples: https://github.com/hl/brr/tree/main/prompts)")
+	fmt.Fprintln(os.Stderr, "    2. Copy workflows to .brr/workflows/ (example: prompts/workflows/ship.yaml)")
+	fmt.Fprintln(os.Stderr, "    3. Run them: brr plan  or  brr workflow ship")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "  Docs: https://github.com/hl/brr")
 
 	return nil
 }

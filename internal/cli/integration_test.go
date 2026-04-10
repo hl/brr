@@ -208,15 +208,15 @@ func TestSetVersionFormat(t *testing.T) {
 }
 
 func TestPrintConfigFormatting(t *testing.T) {
-	// Capture stdout
-	old := os.Stdout
+	// Capture stderr
+	old := os.Stderr
 	r, w, _ := os.Pipe()
-	os.Stdout = w
+	os.Stderr = w
 
 	printConfig("plan", "claude", []string{"claude", "-p"}, 0)
 
 	w.Close()
-	os.Stdout = old
+	os.Stderr = old
 
 	buf := make([]byte, 4096)
 	n, _ := r.Read(buf)
@@ -234,14 +234,14 @@ func TestPrintConfigFormatting(t *testing.T) {
 }
 
 func TestPrintConfigWithMax(t *testing.T) {
-	old := os.Stdout
+	old := os.Stderr
 	r, w, _ := os.Pipe()
-	os.Stdout = w
+	os.Stderr = w
 
 	printConfig("plan", "claude", []string{"claude"}, 5)
 
 	w.Close()
-	os.Stdout = old
+	os.Stderr = old
 
 	buf := make([]byte, 4096)
 	n, _ := r.Read(buf)
