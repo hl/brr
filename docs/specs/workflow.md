@@ -10,7 +10,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 2. Workflow files are YAML. Resolution follows the same pattern as prompts: `.brr/workflows/<name>.yaml` first, then `<user-config-dir>/brr/workflows/<name>.yaml`. The first match wins. If no file is found, the command returns an error listing both searched paths.
 3. The YAML schema has two top-level keys: `stages` (required, list) and `max_cycles` (optional, integer, default 3). Each stage has `prompt` (required, string), `max` (required, positive integer), `profile` (optional, string), and `cycle` (optional, boolean, default false).
 4. Validation rules: at least one stage must be defined; each stage must have a non-empty `prompt` and a `max` greater than zero; at most one stage may set `cycle: true`; `max_cycles` must be greater than zero.
-5. Profile resolution per stage: if the stage specifies `profile`, use it; otherwise use the config's default profile. Profile resolution uses the same `config.ResolveProfile` function as the main command.
+5. Profile resolution per stage follows a three-tier priority: if the stage specifies `profile`, use it; otherwise use the `--profile` CLI flag; otherwise use the config's default profile. Profile resolution uses the same `config.ResolveProfile` function as the main command.
 6. Prompt resolution per stage uses the same `resolvePrompt` function as the main command.
 7. The workflow acquires the exclusive lock (`.brr.lock`) once before the first stage and holds it until the workflow exits. Individual engine runs skip lock acquisition.
 8. Stages execute sequentially. For each stage, the workflow resolves the prompt and profile, prints a stage header, then calls the engine. The engine's `SkipLock` option must be true.
@@ -26,7 +26,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 12. The cycle check uses a simple string search for `- [ ] ` (with the trailing space) in `IMPLEMENTATION_PLAN.md`. If the file does not exist or cannot be read, no tasks remain.
 13. On startup, the workflow prints the banner, then a workflow summary: name, number of stages, max cycles, and the list of stages with their prompts and limits. All workflow output goes to stderr.
 14. The `--profile` flag on the workflow command sets a default profile for all stages. Per-stage `profile` in the YAML overrides this. If neither is set, the config default applies.
-15. The `--notify` flag sends a desktop notification when the workflow completes (not per-stage).
+15. The `--notify` flag sends a desktop notification when the workflow completes successfully or stops due to error (not per-stage). Approval pauses and interrupts do not trigger notifications.
 16. Exit codes: 0 for success or approval pause, 1 for errors, 130 for interrupt.
 17. The workflow persists progress to `.brr-workflow-state.json` after each stage completes. The state file contains the workflow name, the index of the next stage to run, the current cycle count, and the git HEAD SHA at workflow start.
 18. On startup, if `.brr-workflow-state.json` exists and its `workflow` field matches the current workflow name, the workflow resumes from the saved stage and cycle. If the saved stage index is out of bounds (e.g., the workflow YAML was modified), the workflow starts fresh.

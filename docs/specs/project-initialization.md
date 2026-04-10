@@ -7,8 +7,8 @@ Project initialization (`brr init`) scaffolds the files and directories needed t
 ## Requirements
 
 1. `brr init` creates a `.brr.yaml` file in the current directory with starter profiles for common agents.
-2. `brr init` creates a `.brr/prompts/` directory for named prompt files.
-3. `brr init` appends brr's runtime artifacts (`.brr-complete`, `.brr-needs-approval`, `.brr.lock`) to `.gitignore`. If `.gitignore` does not exist, it is created.
+2. `brr init` creates `.brr/prompts/` and `.brr/workflows/` directories for named prompt and workflow files.
+3. `brr init` appends brr's runtime artifacts (`.brr-complete`, `.brr-needs-approval`, `.brr.lock`, `.brr-workflow-state.json`) to `.gitignore`. If `.gitignore` does not exist, it is created.
 4. Entries already present in `.gitignore` are not duplicated. Matching is exact against non-comment, non-empty lines.
 5. If `.brr.yaml` already exists and `--force` is not set, the command fails with an error.
 6. If `.brr.yaml` already exists and `--force` is set, the file is overwritten.
@@ -27,11 +27,12 @@ Project initialization (`brr init`) scaffolds the files and directories needed t
 
 - Depends on `docs/specs/signal-files.md` for signal file names (`.brr-complete`, `.brr-needs-approval`) added to `.gitignore`.
 - Depends on `docs/specs/concurrent-run-prevention.md` for the lock file name (`.brr.lock`) added to `.gitignore`.
+- Depends on `docs/specs/workflow.md` for the workflow state file name (`.brr-workflow-state.json`) added to `.gitignore`.
 - Depends on `docs/specs/file-safety.md` for symlink rejection.
 
 ## Acceptance Criteria
 
-- [ ] `brr init` in a clean directory creates `.brr.yaml`, `.brr/prompts/`, and `.gitignore` entries.
+- [ ] `brr init` in a clean directory creates `.brr.yaml`, `.brr/prompts/`, `.brr/workflows/`, and `.gitignore` entries.
 - [ ] Running `brr init` twice without `--force` fails.
 - [ ] Running `brr init` twice with `--force` overwrites `.brr.yaml`.
 - [ ] Existing `.gitignore` entries are not duplicated.

@@ -7,7 +7,7 @@ Concurrent run prevention ensures that only one brr instance runs in a given wor
 ## Requirements
 
 1. Before starting its first iteration, the engine acquires an exclusive, non-blocking lock on a `.brr.lock` file in the working directory.
-2. If the lock cannot be acquired because another process holds it, the engine exits immediately with an error message: "another brr instance already running in this directory".
+2. If the lock cannot be acquired because another process holds it, the engine exits immediately with an error message: "another brr instance is already running in this directory".
 3. The lock is released when the engine exits, regardless of the exit path (success, error, or signal).
 4. The `.brr.lock` file is intentionally not deleted on exit. Deleting the file would create a race condition where a new process could create and lock a different inode while the old process still holds a lock on the original inode.
 5. On Unix, locking uses `flock()` with `LOCK_EX | LOCK_NB`.

@@ -14,7 +14,7 @@ Configuration defines how brr discovers, loads, and validates its settings. It p
 6. Each profile must have a non-empty `command` field and an optional `args` list of strings.
 7. When resolving a profile by name, the system returns the full command as `[command] + args`. An empty profile name resolves to the default profile.
 8. Requesting a profile that does not exist in the `profiles` map produces an error naming the missing profile.
-9. Error messages reference the specific config file path that caused the validation failure.
+9. Error messages for config loading failures reference the specific config file path. Validation errors identify the invalid field but not the source file, since settings are merged from multiple sources.
 
 ## Constraints
 
@@ -33,6 +33,6 @@ Configuration defines how brr discovers, loads, and validates its settings. It p
 - [ ] Missing config produces a clear error with both searched paths.
 - [ ] Invalid config (missing default, empty profiles, dangling default reference) produces specific validation errors.
 - [ ] Profile resolution returns the correct command slice for both explicit and default profiles.
-- [ ] All error messages include the relevant file path.
+- [ ] Loading error messages include the relevant file path; validation errors identify the invalid field.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.

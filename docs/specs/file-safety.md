@@ -11,7 +11,7 @@ File safety provides TOCTOU-safe file operations used throughout brr. Multiple c
 3. If the file at the path changes between `lstat()` and `open()` (TOCTOU race), the `fstat()` comparison detects the mismatch and returns an error.
 4. A convenience function reads the entire contents of a regular file, combining the safe-open and read operations.
 5. A non-error boolean check reports whether a path points to a regular file (returns false for missing files and non-regular files).
-6. A symlink guard checks whether a path is a symlink and returns an error if so. This is used by write-side callers (such as project initialization) to reject symlinks before writing without needing the full open-read sequence.
+6. Write-side callers (such as project initialization) implement their own symlink guard using `lstat()` to reject symlinks before writing, without needing the full open-read sequence. This check is not centralized in the file safety module.
 
 ## Constraints
 
@@ -30,6 +30,6 @@ File safety provides TOCTOU-safe file operations used throughout brr. Multiple c
 - [ ] Directories are rejected.
 - [ ] TOCTOU race between lstat and open is detected via fstat comparison.
 - [ ] The boolean check returns false for missing files, symlinks, and directories.
-- [ ] The symlink guard rejects symlinks with an error and passes for regular files and missing paths.
+- [ ] Write-side symlink guards reject symlinks with an error and pass for regular files and missing paths.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.
