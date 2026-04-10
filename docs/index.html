@@ -6,7 +6,7 @@
     <title>brr | Your AI agent, but unhinged.</title>
     <meta
       name="description"
-      content="brr runs prompts in a loop with fresh agent sessions every iteration. Use Claude, Codex, or any CLI that reads prompts from stdin."
+      content="brr runs AI agent prompts in a loop with fresh sessions. Chain stages into workflows, pair with quality gates, and build autonomous agentic pipelines. Works with Claude, Codex, or any CLI."
     >
     <link rel="stylesheet" href="./styles.css">
   </head>
@@ -43,9 +43,9 @@
             <p class="tagline">your AI agent, but unhinged</p>
             <p class="repo-link"><a href="https://github.com/hl/brr">https://github.com/hl/brr</a></p>
             <p class="lead">
-              brr runs a prompt in a loop, spinning up a fresh session for each iteration. This page keeps the
-              same terminal-first feel as the CLI help output, but adds the install path, working examples, and
-              config shape in one continuous view.
+              brr runs a prompt in a loop, spinning up a fresh session for each iteration. Chain stages
+              into workflows and pair them with quality gates to build autonomous agentic pipelines —
+              the agent proposes, the gates validate, brr keeps cycling until the work is done.
             </p>
           </section>
 
@@ -160,9 +160,10 @@ profiles:
             <div class="config-layout">
               <div class="copy-block">
                 <p>
-                  Workflows chain multiple loop stages into a pipeline. Each stage runs with its
-                  own prompt and iteration limit. When a later stage (verify, review) finds issues,
-                  the workflow cycles back to the build stage automatically.
+                  Workflows turn brr into an autonomous agentic pipeline. Define stages, point each
+                  at a prompt, and let the cycle-back loop close the feedback gap — build, verify,
+                  fix, repeat. Pair with pre-commit hooks or CI checks and the agent doesn't just
+                  think it's done, something external proves it.
                 </p>
                 <p>
                   Progress is saved to <code>.brr-workflow-state.json</code> after each stage.
