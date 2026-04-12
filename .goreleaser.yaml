@@ -22,20 +22,15 @@ archives:
         formats: ["zip"]
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
-homebrew_casks:
+brews:
   - name: brr
-    binaries:
-      - brr
     description: brr — autonomous AI coding loops for Claude Code
     homepage: https://github.com/hl/brr
     repository:
       owner: hl
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    hooks:
-      post:
-        install: |
-          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/brr"]
+    directory: Formula
 
 checksum:
   name_template: checksums.txt
