@@ -210,6 +210,43 @@ func TestRunSignalFileNeedsApproval(t *testing.T) {
 	}
 }
 
+func TestRunSignalFileFailed(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(SignalFailed, []byte("agent crashed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Use a command that creates a marker file so we can verify it never ran
+	marker := filepath.Join(".", "child-ran")
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "echo", "ran", ">", marker}
+	} else {
+		cmd = []string{"sh", "-c", "touch " + marker}
+	}
+
+	result, err := Run(Options{
+		Prompt:  "test",
+		Max:     5,
+		Command: cmd,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != ReasonFailed {
+		t.Errorf("expected ReasonFailed, got %d", result.Reason)
+	}
+	if result.FailedContent != "agent crashed" {
+		t.Errorf("expected failed content 'agent crashed', got %q", result.FailedContent)
+	}
+
+	// The child should never have run because the signal file pre-existed
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("child process ran despite pre-existing .brr-failed signal file")
+	}
+}
+
 func TestRunSignalFileCreatedByChild(t *testing.T) {
 	t.Chdir(t.TempDir())
 
@@ -237,6 +274,42 @@ func TestRunSignalFileCreatedByChild(t *testing.T) {
 	}
 
 	// Verify only one iteration ran (engine stopped after detecting signal file)
+	data, readErr := os.ReadFile(counter)
+	if readErr != nil {
+		t.Fatal("counter file not created")
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 iteration before signal file stopped the loop, got %d", len(lines))
+	}
+}
+
+func TestRunSignalFileFailedCreatedByChild(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	signalPath := filepath.Join(".", SignalFailed)
+	counter := filepath.Join(".", "iter-counter")
+
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & echo error details > " + signalPath}
+	} else {
+		cmd = []string{"sh", "-c", "echo x >> " + counter + " && echo 'error details' > " + signalPath}
+	}
+
+	result, err := Run(Options{
+		Prompt:  "test",
+		Max:     5,
+		Command: cmd,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != ReasonFailed {
+		t.Errorf("expected ReasonFailed, got %d", result.Reason)
+	}
+
+	// Verify only one iteration ran
 	data, readErr := os.ReadFile(counter)
 	if readErr != nil {
 		t.Fatal("counter file not created")
@@ -354,6 +427,45 @@ func TestCheckSignalFilesComplete(t *testing.T) {
 	}
 	if sig.reason != ReasonComplete {
 		t.Errorf("expected ReasonComplete, got %d", sig.reason)
+	}
+}
+
+func TestCheckSignalFilesFailed(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(SignalFailed, []byte("something broke"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil when .brr-failed exists")
+	}
+	if sig.reason != ReasonFailed {
+		t.Errorf("expected ReasonFailed, got %d", sig.reason)
+	}
+	if sig.failedContent != "something broke" {
+		t.Errorf("expected failed content 'something broke', got %q", sig.failedContent)
+	}
+}
+
+func TestCheckSignalFilesFailedPriorityOverApproval(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// Both .brr-failed and .brr-needs-approval exist — failed takes priority
+	if err := os.WriteFile(SignalFailed, []byte("error"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(SignalNeedsApproval, []byte("review"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil")
+	}
+	if sig.reason != ReasonFailed {
+		t.Errorf("expected ReasonFailed (higher priority), got %d", sig.reason)
 	}
 }
 
@@ -508,6 +620,34 @@ func TestReadCappedUTF8Boundary(t *testing.T) {
 	// Should have backed up to byte 4 (one full emoji)
 	if prefix != "🔥" {
 		t.Errorf("expected one full emoji before truncation, got %q", prefix)
+	}
+}
+
+func TestRunSignalFileFailedCleanedAfterEarlyStop(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(SignalFailed, []byte("error"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "exit 0"}
+	} else {
+		cmd = []string{"true"}
+	}
+
+	_, err := Run(Options{
+		Prompt:  "test",
+		Max:     5,
+		Command: cmd,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(SignalFailed); err == nil {
+		t.Error("expected .brr-failed to be cleaned up after early stop")
 	}
 }
 

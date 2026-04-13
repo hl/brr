@@ -151,6 +151,7 @@ func restoreFile(path string, data []byte, mode os.FileMode, existed bool) error
 // gitignoreEntries are lines brr needs in .gitignore.
 var gitignoreEntries = []string{
 	".brr-complete",
+	".brr-failed",
 	".brr-needs-approval",
 	".brr.lock",
 	".brr-workflow-state.json",

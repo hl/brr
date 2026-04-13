@@ -28,6 +28,9 @@ Signal Files:
   .brr-complete              The agent creates this when all work is finished.
                              brr stops the loop and removes the file.
 
+  .brr-failed                The agent creates this when it encounters a failure.
+                             brr stops and prints the file contents (up to 4 KiB).
+
   .brr-needs-approval        The agent creates this when it needs a human decision.
                              brr stops and prints the file contents (up to 4 KiB).
 

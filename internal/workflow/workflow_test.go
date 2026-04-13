@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hl/brr/internal/config"
+	"github.com/hl/brr/internal/engine"
 )
 
 func TestLoadValidWorkflow(t *testing.T) {
@@ -410,6 +411,62 @@ func TestRunSignalComplete(t *testing.T) {
 	// Second stage should have run
 	if _, err := os.Stat(marker); err != nil {
 		t.Error("second stage did not run after first stage completed via .brr-complete")
+	}
+}
+
+func TestRunSignalFailed(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	// First stage creates .brr-failed — workflow should stop and preserve state
+	var cmd1, cmd2 []string
+	marker := filepath.Join(".", "second-ran")
+	if runtime.GOOS == "windows" {
+		cmd1 = []string{"cmd", "/c", "echo error > .brr-failed"}
+		cmd2 = []string{"cmd", "/c", "echo ran > " + marker}
+	} else {
+		cmd1 = []string{"sh", "-c", "echo 'error details' > .brr-failed"}
+		cmd2 = []string{"sh", "-c", "touch " + marker}
+	}
+
+	wf := Workflow{
+		Stages: []Stage{
+			{Prompt: "first", Max: 5, Profile: "cmd1"},
+			{Prompt: "second", Max: 1, Profile: "cmd2"},
+		},
+		MaxCycles: 1,
+	}
+
+	cfg := config.Config{
+		Default: "cmd1",
+		Profiles: map[string]config.Profile{
+			"cmd1": {Command: cmd1[0], Args: cmd1[1:]},
+			"cmd2": {Command: cmd2[0], Args: cmd2[1:]},
+		},
+	}
+
+	result, err := Run(Options{
+		Name:     "test",
+		Workflow: wf,
+		Config:   cfg,
+		ResolvePrompt: func(name string) (string, error) {
+			return "go", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reason != engine.ReasonFailed {
+		t.Errorf("expected ReasonFailed, got %d", result.Reason)
+	}
+
+	// Second stage should NOT have run
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("second stage ran despite first stage failing via .brr-failed")
+	}
+
+	// State file should be preserved for resume
+	if _, err := os.Stat(StateFile); err != nil {
+		t.Error("expected state file to be preserved on failure")
 	}
 }
 

@@ -186,6 +186,13 @@ func Run(opts Options) (*engine.Result, error) {
 			return result, fmt.Errorf("stage %d (%s): %w", stageIdx+1, stage.Prompt, err)
 		}
 
+		if result != nil && result.Reason == engine.ReasonFailed {
+			// State file stays at current stage — resume will retry after failure is investigated
+			fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow stopped — stage %q failed%s\n", ui.Bold, ui.Red, stage.Prompt, ui.Reset)
+			fmt.Fprintf(os.Stderr, "  %sDelete .brr-failed and re-run to resume.%s\n", ui.Dim, ui.Reset)
+			return result, nil
+		}
+
 		if result != nil && result.Reason == engine.ReasonApproval {
 			// State file stays at current stage — resume will retry after approval is resolved
 			fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow paused — stage %q needs approval%s\n", ui.Bold, ui.Yellow, stage.Prompt, ui.Reset)

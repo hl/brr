@@ -54,6 +54,29 @@ func TestFormatApprovalTruncatesLongContent(t *testing.T) {
 	}
 }
 
+func TestFormatFailed(t *testing.T) {
+	title, body := format(&engine.Result{Reason: engine.ReasonFailed})
+	if title != "brr — failed" {
+		t.Errorf("unexpected title: %q", title)
+	}
+	if body != "The agent reported a failure." {
+		t.Errorf("unexpected body: %q", body)
+	}
+}
+
+func TestFormatFailedWithContent(t *testing.T) {
+	title, body := format(&engine.Result{
+		Reason:        engine.ReasonFailed,
+		FailedContent: "API error: rate limited",
+	})
+	if title != "brr — failed" {
+		t.Errorf("unexpected title: %q", title)
+	}
+	if body != "API error: rate limited" {
+		t.Errorf("unexpected body: %q", body)
+	}
+}
+
 func TestFormatMaxIterations(t *testing.T) {
 	title, body := format(&engine.Result{Reason: engine.ReasonMaxIterations})
 	if title != "brr — max iterations" {

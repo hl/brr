@@ -20,6 +20,14 @@ func format(result *engine.Result) (title, body string) {
 	switch result.Reason {
 	case engine.ReasonComplete:
 		return "brr — complete", "All tasks complete."
+	case engine.ReasonFailed:
+		title = "brr — failed"
+		if result.FailedContent != "" {
+			body = truncate(result.FailedContent, 256)
+		} else {
+			body = "The agent reported a failure."
+		}
+		return title, body
 	case engine.ReasonApproval:
 		title = "brr — approval needed"
 		if result.ApprovalContent != "" {

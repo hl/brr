@@ -31,6 +31,7 @@ const maxFailStreak = 3
 // Signal file paths used by the brr engine.
 const (
 	SignalComplete      = ".brr-complete"
+	SignalFailed        = ".brr-failed"
 	SignalNeedsApproval = ".brr-needs-approval"
 )
 
@@ -42,6 +43,7 @@ type StopReason int
 
 const (
 	ReasonComplete      StopReason = iota // .brr-complete signal file
+	ReasonFailed                          // .brr-failed signal file
 	ReasonApproval                        // .brr-needs-approval signal file
 	ReasonMaxIterations                   // max iteration count reached
 	ReasonFailStreak                      // too many consecutive failures
@@ -52,6 +54,7 @@ const (
 type Result struct {
 	Reason          StopReason
 	ApprovalContent string // populated only for ReasonApproval
+	FailedContent   string // populated only for ReasonFailed
 }
 
 // Options configures a loop run.
@@ -83,16 +86,19 @@ func Run(opts Options) (*Result, error) {
 	if sig := checkSignalFiles(); sig != nil {
 		// Clean up the signal files so they don't block subsequent runs
 		removeIfRegular(SignalComplete)
+		removeIfRegular(SignalFailed)
 		removeIfRegular(SignalNeedsApproval)
-		return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
+		return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent, FailedContent: sig.failedContent}, nil
 	}
 
 	// Clean up stale signal files from previous runs
 	removeIfRegular(SignalComplete)
+	removeIfRegular(SignalFailed)
 	removeIfRegular(SignalNeedsApproval)
 
 	// Clean up signal files on exit (only regular files — never delete dirs/symlinks)
 	defer func() { removeIfRegular(SignalComplete) }()
+	defer func() { removeIfRegular(SignalFailed) }()
 	defer func() { removeIfRegular(SignalNeedsApproval) }()
 
 	// Track the currently running subprocess so we can forward signals
@@ -177,7 +183,7 @@ func Run(opts Options) (*Result, error) {
 		}
 
 		if sig := checkSignalFiles(); sig != nil {
-			return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
+			return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent, FailedContent: sig.failedContent}, nil
 		}
 
 		// Print iteration header
@@ -236,7 +242,7 @@ func Run(opts Options) (*Result, error) {
 
 		// Check for signal files immediately after subprocess exits
 		if sig := checkSignalFiles(); sig != nil {
-			return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent}, nil
+			return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent, FailedContent: sig.failedContent}, nil
 		}
 
 		// If user requested stop (first Ctrl+C), exit gracefully now that the iteration is done
@@ -296,15 +302,38 @@ func removeIfRegular(path string) {
 type signalResult struct {
 	reason          StopReason
 	approvalContent string
+	failedContent   string
 }
 
-// checkSignalFiles checks for .brr-complete and .brr-needs-approval.
+// checkSignalFiles checks for .brr-complete, .brr-failed, and .brr-needs-approval.
 // Only regular files are treated as signals (symlinks and directories are ignored).
 // Returns nil if no signal file was found.
 func checkSignalFiles() *signalResult {
 	if fsutil.IsRegularFile(SignalComplete) {
 		fmt.Fprintf(os.Stderr, "\n  %s%s✓ All tasks complete%s (%s found). Stopping.\n", ui.Bold, ui.Green, ui.Reset, SignalComplete)
 		return &signalResult{reason: ReasonComplete}
+	}
+	if f, err := fsutil.OpenRegularFile(SignalFailed); err == nil {
+		fmt.Fprintf(os.Stderr, "\n  %s%s✗ Agent failed%s (%s found):\n", ui.Bold, ui.Red, ui.Reset, SignalFailed)
+		content, readErr := readCappedFromFile(f, maxApprovalFileSize)
+		_ = f.Close()
+		var failedContent string
+		if readErr == nil {
+			trimmed := strings.TrimSpace(content)
+			if trimmed != "" {
+				fmt.Fprintln(os.Stderr, trimmed)
+				failedContent = trimmed
+			} else {
+				fmt.Fprintln(os.Stderr, "  (no details provided)")
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "  (could not read details: %v)\n", readErr)
+		}
+		return &signalResult{reason: ReasonFailed, failedContent: failedContent}
+	} else if fsutil.IsRegularFile(SignalFailed) {
+		fmt.Fprintf(os.Stderr, "\n  %s%s✗ Agent failed%s (%s found):\n", ui.Bold, ui.Red, ui.Reset, SignalFailed)
+		fmt.Fprintf(os.Stderr, "  (could not read details: %v)\n", err)
+		return &signalResult{reason: ReasonFailed}
 	}
 	// Try to open and read in one pass; fall back to existence check for unreadable files
 	if f, err := fsutil.OpenRegularFile(SignalNeedsApproval); err == nil {

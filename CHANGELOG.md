@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `.brr-failed` signal file — agents can now distinguish failure from needing approval. brr stops the loop, prints the file contents, and in workflows preserves state for resume. Previously, failures had to be shoehorned into `.brr-needs-approval`.
+
 ## [0.3.0] "Pipes Not Words" - 2026-04-10
 
 ### Added
