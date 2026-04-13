@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] "Red Light, Green Light" - 2026-04-13
+
 ### Added
 
 - `.brr-failed` signal file — agents can now distinguish failure from needing approval. brr stops the loop, prints the file contents, and in workflows preserves state for resume. Previously, failures had to be shoehorned into `.brr-needs-approval`.
+
+### Fixed
+
+- Homebrew install now uses a formula instead of a cask, matching the expected install path for CLI binaries
 
 ## [0.3.0] "Pipes Not Words" - 2026-04-10
 
