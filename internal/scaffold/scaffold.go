@@ -1,17 +1,18 @@
 package scaffold
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hl/brr/internal/fsutil"
 )
 
 // Init scaffolds a project for brr.
 func Init(force bool) error {
 	// Pre-flight: reject symlinks to prevent writes outside the repo
-	for _, path := range []string{".brr.yaml", ".gitignore", ".brr"} {
+	for _, path := range []string{".brr.yaml", ".gitignore", ".brr", filepath.Join(".brr", "prompts"), filepath.Join(".brr", "workflows")} {
 		if err := rejectSymlink(path); err != nil {
 			return err
 		}
@@ -31,7 +32,7 @@ func Init(force bool) error {
 		workflowDir: filepath.Join(".brr", "workflows"),
 	}
 	if yamlExists {
-		data, err := os.ReadFile(".brr.yaml")
+		data, err := fsutil.ReadRegularFile(".brr.yaml")
 		if err != nil {
 			return fmt.Errorf("cannot back up .brr.yaml for rollback: %w", err)
 		}
@@ -55,10 +56,20 @@ func Init(force bool) error {
 	}
 
 	// Stage 2: create .brr/prompts/ and .brr/workflows/
+	if err := rejectSymlink(rb.promptDir); err != nil {
+		if rErr := restoreFile(".brr.yaml", rb.yamlData, rb.yamlMode, rb.yamlExisted); rErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
+		}
+		return err
+	}
 	if err := os.MkdirAll(rb.promptDir, 0o755); err != nil {
 		if rErr := restoreFile(".brr.yaml", rb.yamlData, rb.yamlMode, rb.yamlExisted); rErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
 		}
+		return err
+	}
+	if err := rejectSymlink(rb.workflowDir); err != nil {
+		rb.rollback()
 		return err
 	}
 	if err := os.MkdirAll(rb.workflowDir, 0o755); err != nil {
@@ -139,11 +150,16 @@ func rejectSymlink(path string) error {
 // Returns an error if the rollback itself fails.
 func restoreFile(path string, data []byte, mode os.FileMode, existed bool) error {
 	if existed {
-		return os.WriteFile(path, data, mode)
+		if err := rejectSymlink(path); err != nil {
+			return err
+		}
+		return atomicWriteFile(path, data, mode)
 	}
-	err := os.Remove(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
+	if fsutil.IsRegularFile(path) {
+		err := os.Remove(path)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 	return nil
 }
@@ -160,7 +176,17 @@ var gitignoreEntries = []string{
 // updateGitignore appends missing brr entries to .gitignore.
 // Returns true if any entries were added.
 func updateGitignore() (bool, error) {
-	existing, err := os.ReadFile(".gitignore")
+	mode := os.FileMode(0o644)
+	if info, err := os.Lstat(".gitignore"); err == nil {
+		if !info.Mode().IsRegular() {
+			return false, fmt.Errorf(".gitignore is not a regular file")
+		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+
+	existing, err := fsutil.ReadRegularFile(".gitignore")
 	if err != nil && !os.IsNotExist(err) {
 		return false, err
 	}
@@ -187,26 +213,18 @@ func updateGitignore() (bool, error) {
 	}
 
 	var buf strings.Builder
-	// Add a blank line separator if file doesn't end with newline
-	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+	if len(content) > 0 {
+		if !strings.HasSuffix(content, "\n") {
+			buf.WriteString("\n")
+		}
 		buf.WriteString("\n")
 	}
-	buf.WriteString("\n# brr\n")
+	buf.WriteString("# brr\n")
 	for _, entry := range missing {
 		buf.WriteString(entry + "\n")
 	}
 
-	f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return false, err
-	}
-	_, writeErr := f.WriteString(buf.String())
-	closeErr := f.Close()
-	if err := errors.Join(writeErr, closeErr); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return true, atomicWriteFile(".gitignore", []byte(content+buf.String()), mode)
 }
 
 func writeBrrYAML() error {

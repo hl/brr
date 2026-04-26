@@ -7,7 +7,7 @@ import (
 )
 
 // ANSI color codes used across the CLI.
-// Empty when stdout is not a terminal.
+// Empty when stderr is not a terminal.
 var (
 	Bold    = "\033[1m"
 	Dim     = "\033[2m"
@@ -21,7 +21,7 @@ var (
 )
 
 func init() {
-	if !term.IsTerminal(int(os.Stdout.Fd())) {
+	if !term.IsTerminal(int(os.Stderr.Fd())) {
 		Bold = ""
 		Dim = ""
 		Blue = ""

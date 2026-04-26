@@ -18,7 +18,7 @@ You are one iteration of a build loop. Implement one task, validate, commit, exi
 
 1. Run the project's validation commands (see `AGENTS.md`)
 2. If validation fails, fix the root cause and re-run (up to 3 attempts)
-3. If still failing after 3 attempts, discard changes with `git checkout -- .` and note the blocker in `IMPLEMENTATION_PLAN.md`
+3. If still failing after 3 attempts, create `.brr-failed` with the failing command, error summary, and changed files, then exit without committing
 
 ## Phase 4: Commit
 

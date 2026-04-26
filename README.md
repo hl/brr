@@ -102,6 +102,7 @@ brr pipes the same prompt to the configured command, once per iteration. Each ru
 The loop is controlled by signal files in the working directory:
 
 - **`.brr-complete`** — the agent creates this when all work is finished. brr detects it, stops the loop, and removes the file.
+- **`.brr-failed`** — the agent creates this when it hits a blocker or cannot recover after retrying. brr stops the loop and prints the file contents (up to 4 KiB). Investigate the failure, delete the file, and re-run.
 - **`.brr-needs-approval`** — the agent creates this when it needs a human decision. brr stops the loop and prints the file contents (up to 4 KiB). Resolve the issue, delete the file, and re-run.
 - **`.brr.lock`** — prevents multiple brr instances from running in the same directory. Acquired on start, released on exit. The file stays on disk between runs (this is intentional). Added to `.gitignore` by `brr init`.
 

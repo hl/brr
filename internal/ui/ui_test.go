@@ -3,7 +3,7 @@ package ui
 import "testing"
 
 func TestColorsEmptyInNonTerminal(t *testing.T) {
-	// Test runner stdout is piped (not a terminal), so init() should have
+	// Test runner stderr is piped (not a terminal), so init() should have
 	// set all color codes to empty strings.
 	codes := map[string]string{
 		"Bold":    Bold,

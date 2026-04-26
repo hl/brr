@@ -66,16 +66,20 @@ func Resolve(name string) ([]byte, error) {
 	}
 
 	projectPath := filepath.Join(".brr", "workflows", name+".yaml")
-	if data, err := os.ReadFile(projectPath); err == nil {
+	if data, err := fsutil.ReadRegularFile(projectPath); err == nil {
 		return data, nil
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("reading %s: %w", projectPath, err)
 	}
 
 	configHint := "<config-dir>/brr/workflows/" + name + ".yaml"
 	if configDir, err := os.UserConfigDir(); err == nil {
 		userPath := filepath.Join(configDir, "brr", "workflows", name+".yaml")
 		configHint = userPath
-		if data, err := os.ReadFile(userPath); err == nil {
+		if data, err := fsutil.ReadRegularFile(userPath); err == nil {
 			return data, nil
+		} else if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("reading %s: %w", userPath, err)
 		}
 	}
 
@@ -253,13 +257,59 @@ func trySaveState(s *State) {
 		fmt.Fprintf(os.Stderr, "warning: could not save workflow state: %v\n", err)
 		return
 	}
-	if err := os.WriteFile(StateFile, data, 0o644); err != nil {
+	if err := atomicWriteRegularFile(StateFile, data, 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not save workflow state: %v\n", err)
 	}
 }
 
 func deleteState() {
-	_ = os.Remove(StateFile)
+	if fsutil.IsRegularFile(StateFile) {
+		_ = os.Remove(StateFile)
+	}
+}
+
+func atomicWriteRegularFile(path string, data []byte, perm os.FileMode) error {
+	if err := rejectNonRegularPath(path); err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".brr-state-*")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := rejectNonRegularPath(path); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
+}
+
+func rejectNonRegularPath(path string) error {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking %s: %w", path, err)
+	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", path)
+	}
+	return nil
 }
 
 func gitHEAD() string {

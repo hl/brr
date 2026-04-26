@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -48,6 +50,46 @@ profiles:
 	}
 	if len(p.Args) != 2 || p.Args[0] != "--fast" {
 		t.Errorf("expected args [--fast, --no-confirm], got %v", p.Args)
+	}
+}
+
+func TestLoadProjectConfigSymlinkRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	target := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(target, []byte(`default: linked
+profiles:
+  linked:
+    command: linked
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ".brr.yaml"); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected symlinked project config to be rejected")
+	}
+	if !strings.Contains(err.Error(), ".brr.yaml") {
+		t.Errorf("expected error to mention .brr.yaml, got: %v", err)
+	}
+}
+
+func TestLoadProjectConfigDirectoryRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.Mkdir(".brr.yaml", 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected directory project config to be rejected")
+	}
+	if !strings.Contains(err.Error(), ".brr.yaml") {
+		t.Errorf("expected error to mention .brr.yaml, got: %v", err)
 	}
 }
 

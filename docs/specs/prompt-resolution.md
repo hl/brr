@@ -31,8 +31,9 @@ Prompt resolution determines how a user-provided prompt argument is interpreted 
 
 - [ ] Inline text passes through unchanged.
 - [ ] A valid file path returns the file's contents.
-- [ ] Symlinks, directories, and FIFOs fall through to the next resolution stage.
+- [ ] Direct symlinks, directories, and FIFOs fall through to the next resolution stage without being read.
 - [ ] Named prompts resolve from project-local before user-global.
+- [ ] Symlinks and other non-regular files at named prompt paths are rejected.
 - [ ] Path traversal (`..`) in named prompts is rejected.
 - [ ] Files over 10 MiB are rejected.
 - [ ] Empty/whitespace-only prompts produce an error.

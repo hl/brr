@@ -3,6 +3,7 @@ package notify
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/hl/brr/internal/engine"
 )
@@ -119,5 +120,19 @@ func TestTruncateLong(t *testing.T) {
 		if len(prefix) != lastSpace {
 			t.Errorf("expected word-boundary truncation, got %q", result)
 		}
+	}
+}
+
+func TestTruncatePreservesUTF8(t *testing.T) {
+	s := strings.Repeat("🔥", 10)
+	result := truncate(s, 6)
+	if !utf8.ValidString(result) {
+		t.Fatalf("truncate returned invalid UTF-8: %q", result)
+	}
+	if !strings.HasSuffix(result, "…") {
+		t.Fatal("expected truncation marker")
+	}
+	if strings.TrimSuffix(result, "…") != "🔥" {
+		t.Fatalf("expected one complete rune before truncation, got %q", result)
 	}
 }

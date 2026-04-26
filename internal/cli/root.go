@@ -159,7 +159,7 @@ func resolvePrompt(nameOrPath string) (string, error) {
 		projectPath := filepath.Join(".brr", "prompts", name+".md")
 		if data, err := fsutil.ReadRegularFile(projectPath); err == nil {
 			return string(data), nil
-		} else if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, fsutil.ErrNotRegularFile) {
+		} else if !errors.Is(err, os.ErrNotExist) {
 			return "", fmt.Errorf("reading %s: %w", projectPath, err)
 		}
 
@@ -168,7 +168,7 @@ func resolvePrompt(nameOrPath string) (string, error) {
 			userPath := filepath.Join(configDir, "brr", "prompts", name+".md")
 			if data, err := fsutil.ReadRegularFile(userPath); err == nil {
 				return string(data), nil
-			} else if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, fsutil.ErrNotRegularFile) {
+			} else if !errors.Is(err, os.ErrNotExist) {
 				return "", fmt.Errorf("reading %s: %w", userPath, err)
 			}
 		}

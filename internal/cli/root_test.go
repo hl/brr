@@ -219,16 +219,14 @@ func TestResolvePromptNamedSymlinkRejected(t *testing.T) {
 		t.Skip("symlinks not supported")
 	}
 
-	// Should NOT read through the symlink — should fall through to inline text
-	text, err := resolvePrompt("evil")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Should NOT read through the symlink or silently treat the prompt name as
+	// inline text. A named prompt path exists, but it is unsafe.
+	_, err := resolvePrompt("evil")
+	if err == nil {
+		t.Fatal("expected symlinked named prompt to be rejected")
 	}
-	if text == "secret data" {
-		t.Error("symlink in .brr/prompts/ should not be followed")
-	}
-	if text != "evil" {
-		t.Errorf("expected fallthrough to inline text 'evil', got %q", text)
+	if !strings.Contains(err.Error(), filepath.Join(".brr", "prompts", "evil.md")) {
+		t.Errorf("expected error to mention named prompt path, got: %v", err)
 	}
 }
 

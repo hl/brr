@@ -195,6 +195,29 @@ func TestInitSymlinkBrrDirRejected(t *testing.T) {
 	}
 }
 
+func TestInitSymlinkPromptDirRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.Mkdir(".brr", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "target-prompts")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(".brr", "prompts")); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	err := Init(false)
+	if err == nil {
+		t.Fatal("expected error when .brr/prompts is a symlink")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("expected symlink error, got: %v", err)
+	}
+}
+
 func TestInitWriteOnlyYAMLRequiresForce(t *testing.T) {
 	t.Chdir(t.TempDir())
 

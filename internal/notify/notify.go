@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hl/brr/internal/engine"
 )
@@ -54,6 +55,9 @@ func truncate(s string, maxLen int) string {
 	cut := strings.LastIndex(s[:maxLen], " ")
 	if cut <= 0 {
 		cut = maxLen
+	}
+	for cut > 0 && !utf8.ValidString(s[:cut]) {
+		cut--
 	}
 	return s[:cut] + "…"
 }

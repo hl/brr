@@ -1,12 +1,14 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 
+	"github.com/hl/brr/internal/fsutil"
 	"github.com/spf13/viper"
 )
 
@@ -43,9 +45,12 @@ func Load() (Config, error) {
 		}
 	}
 
-	// Layer 2: project config
-	v.SetConfigFile(".brr.yaml")
-	if err := v.MergeInConfig(); err == nil {
+	// Layer 2: project config. Read through fsutil so project config never
+	// follows symlinks or other non-regular files.
+	if data, err := fsutil.ReadRegularFile(".brr.yaml"); err == nil {
+		if err := v.MergeConfig(bytes.NewReader(data)); err != nil {
+			return cfg, fmt.Errorf("reading .brr.yaml: %w", err)
+		}
 		found = true
 	} else if !isConfigNotFound(err) {
 		return cfg, fmt.Errorf("reading .brr.yaml: %w", err)

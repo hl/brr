@@ -122,6 +122,10 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
 			}
 		}
+	} else if doNotify && result != nil && result.Reason == engine.ReasonFailed {
+		if nErr := notify.Send(result); nErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
+		}
 	}
 
 	if errors.Is(runErr, engine.ErrInterrupted) {

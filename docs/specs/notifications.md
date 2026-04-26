@@ -10,16 +10,17 @@ and need a nudge when the loop ends and attention is required.
 
 1. A notification is sent when the loop stops for any of these reasons:
    - All tasks complete (`.brr-complete` signal file found)
+   - Agent-reported failure (`.brr-failed` signal file found)
    - Human approval needed (`.brr-needs-approval` signal file found)
    - Too many consecutive failures (fail streak reaches the maximum)
    - Max iterations reached
 2. Each notification includes a title and body that identify which terminal
-   event occurred. The approval notification includes the approval file
-   contents carried in the engine's stop reason (read before signal file
+   event occurred. The failed and approval notifications include the signal
+   file contents carried in the engine's stop reason (read before signal file
    cleanup per `loop-engine.md` requirement 10), truncated to fit platform
-   limits. If the engine could not read the file at detection time (per
-   `signal-files.md` requirement 5), the notification body states that
-   approval is needed without file contents.
+   limits while preserving valid UTF-8. If the engine could not read the file
+   at detection time (per `signal-files.md` requirement 6), the notification
+   body states that failure or approval is needed without file contents.
 3. Notifications are enabled with `--notify` / `-n` flag. Off by default.
 4. When the terminal is not interactive (stderr is not a TTY), `--notify`
    is accepted but may silently no-op if the platform has no notification
@@ -43,13 +44,13 @@ and need a nudge when the loop ends and attention is required.
 
 ## Dependencies
 
-- Depends on `docs/specs/loop-engine.md` for structured stop reasons (requirement 10) that distinguish the four terminal events.
+- Depends on `docs/specs/loop-engine.md` for structured stop reasons (requirement 10) that distinguish the terminal events.
 - Depends on `docs/specs/signal-files.md` for signal file names and the unreadable-file flow.
 
 ## Acceptance Criteria
 
-- [x] `brr <prompt> --notify` sends a desktop notification on each of the
-      four terminal events listed in requirement 1.
+- [x] `brr <prompt> --notify` sends a desktop notification on each terminal
+      event listed in requirement 1.
 - [x] `brr <prompt>` (without `--notify`) sends no notifications.
 - [x] Ctrl+C stop does not trigger a notification.
 - [x] A notification failure (e.g. `notify-send` missing on Linux) is logged

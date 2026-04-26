@@ -469,6 +469,25 @@ func TestCheckSignalFilesFailedPriorityOverApproval(t *testing.T) {
 	}
 }
 
+func TestCheckSignalFilesCompletePriorityOverFailed(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(SignalComplete, []byte("done"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(SignalFailed, []byte("error"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil")
+	}
+	if sig.reason != ReasonComplete {
+		t.Errorf("expected ReasonComplete (highest priority), got %d", sig.reason)
+	}
+}
+
 func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 	t.Chdir(t.TempDir())
 
@@ -540,6 +559,29 @@ func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
 	}
 	if sig.approvalContent != "" {
 		t.Errorf("expected empty approval content for unreadable file, got %q", sig.approvalContent)
+	}
+}
+
+func TestCheckSignalFilesFailedUnreadable(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(SignalFailed, []byte("secret"), 0o200); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(SignalFailed, 0o000); err != nil {
+		t.Skip("cannot remove read permission")
+	}
+	defer os.Chmod(SignalFailed, 0o644)
+
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil when .brr-failed exists but is unreadable")
+	}
+	if sig.reason != ReasonFailed {
+		t.Errorf("expected ReasonFailed, got %d", sig.reason)
+	}
+	if sig.failedContent != "" {
+		t.Errorf("expected empty failed content for unreadable file, got %q", sig.failedContent)
 	}
 }
 

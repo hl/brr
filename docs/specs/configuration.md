@@ -33,6 +33,7 @@ Configuration defines how brr discovers, loads, and validates its settings. It p
 - [ ] Missing config produces a clear error with both searched paths.
 - [ ] Invalid config (missing default, empty profiles, dangling default reference) produces specific validation errors.
 - [ ] Profile resolution returns the correct command slice for both explicit and default profiles.
+- [ ] Project-local `.brr.yaml` symlinks and other non-regular files are rejected.
 - [ ] Loading error messages include the relevant file path; validation errors identify the invalid field.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.

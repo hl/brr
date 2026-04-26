@@ -165,6 +165,30 @@ func TestResolvePathTraversal(t *testing.T) {
 	}
 }
 
+func TestResolveProjectWorkflowSymlinkRejected(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	dir := filepath.Join(".brr", "workflows")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "ship.yaml")
+	if err := os.WriteFile(target, []byte("stages:\n  - prompt: build\n    max: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(dir, "ship.yaml")); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	_, err := Resolve("ship")
+	if err == nil {
+		t.Fatal("expected symlinked workflow to be rejected")
+	}
+	if !strings.Contains(err.Error(), filepath.Join(".brr", "workflows", "ship.yaml")) {
+		t.Errorf("expected error to mention workflow path, got: %v", err)
+	}
+}
+
 func TestHasUnfinishedTasks(t *testing.T) {
 	t.Chdir(t.TempDir())
 
@@ -880,6 +904,46 @@ func TestStateFileIsValidJSON(t *testing.T) {
 	}
 	if raw["start_sha"] != "def456" {
 		t.Errorf("expected start_sha 'def456', got %v", raw["start_sha"])
+	}
+}
+
+func TestTrySaveStateRejectsSymlink(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	target := filepath.Join(t.TempDir(), "target-state")
+	if err := os.WriteFile(target, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, StateFile); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	trySaveState(&State{Workflow: "test", Stage: 1, Cycle: 0, StartSHA: "abc"})
+
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "keep" {
+		t.Fatalf("state write followed symlink and modified target: %q", data)
+	}
+}
+
+func TestDeleteStateIgnoresDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.Mkdir(StateFile, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	deleteState()
+
+	fi, err := os.Stat(StateFile)
+	if err != nil {
+		t.Fatalf("state directory was removed: %v", err)
+	}
+	if !fi.IsDir() {
+		t.Fatal("expected state path to remain a directory")
 	}
 }
 

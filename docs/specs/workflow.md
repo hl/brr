@@ -19,6 +19,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
     - `ReasonComplete`: continue to the next stage.
     - `ReasonMaxIterations` with nil error: continue to the next stage.
     - `ReasonMaxIterations` with error (last iteration failed): stop the workflow with an error.
+    - `ReasonFailed`: stop the workflow, preserve the state file, print the failure content, and exit with code 0 so the workflow can resume after the failure is investigated.
     - `ReasonApproval`: stop the workflow, print the approval content, exit with code 0.
     - `ReasonFailStreak`: stop the workflow with an error.
     - `ReasonInterrupted`: stop the workflow, exit with code 130.
@@ -26,7 +27,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 12. The cycle check uses a simple string search for `- [ ] ` (with the trailing space) in `IMPLEMENTATION_PLAN.md`. If the file does not exist or cannot be read, no tasks remain.
 13. On startup, the workflow prints the banner, then a workflow summary: name, number of stages, max cycles, and the list of stages with their prompts and limits. All workflow output goes to stderr.
 14. The `--profile` flag on the workflow command sets a default profile for all stages. Per-stage `profile` in the YAML overrides this. If neither is set, the config default applies.
-15. The `--notify` flag sends a desktop notification when the workflow completes successfully or stops due to error (not per-stage). Approval pauses and interrupts do not trigger notifications.
+15. The `--notify` flag sends a desktop notification when the workflow completes successfully, stops due to `.brr-failed`, or stops due to error (not per-stage). Approval pauses and interrupts do not trigger notifications.
 16. Exit codes: 0 for success or approval pause, 1 for errors, 130 for interrupt.
 17. The workflow persists progress to `.brr-workflow-state.json` after each stage completes. The state file contains the workflow name, the index of the next stage to run, the current cycle count, and the git HEAD SHA at workflow start.
 18. On startup, if `.brr-workflow-state.json` exists and its `workflow` field matches the current workflow name, the workflow resumes from the saved stage and cycle. If the saved stage index is out of bounds (e.g., the workflow YAML was modified), the workflow starts fresh.
@@ -40,6 +41,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 - No new external dependencies. YAML parsing uses `go.yaml.in/yaml/v3` already available via viper.
 - The workflow must work on Linux, macOS, and Windows.
 - Workflow resolution must reject path traversal (`..`) in the name argument, consistent with prompt resolution.
+- Workflow resolution and state persistence must not follow symlinks.
 - The workflow must not modify `IMPLEMENTATION_PLAN.md` itself. Only the agent (via prompts) modifies shared state files.
 
 ## Dependencies
@@ -55,6 +57,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 
 - [ ] `brr workflow ship` loads and executes `.brr/workflows/ship.yaml`.
 - [ ] Workflow file resolution searches project then user config directory.
+- [ ] Workflow file resolution rejects symlinks and other non-regular files.
 - [ ] Missing workflow file returns an error listing both searched paths.
 - [ ] Invalid YAML (missing stages, zero max, multiple cycle stages) is rejected with a clear error.
 - [ ] Stages execute sequentially — each stage's engine run completes before the next starts.
@@ -62,15 +65,17 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 - [ ] The lock is held for the entire workflow duration, not per-stage.
 - [ ] Engine runs use `SkipLock: true`.
 - [ ] `ReasonApproval` stops the workflow and exits 0.
+- [ ] `ReasonFailed` stops the workflow, preserves state, and exits 0.
 - [ ] `ReasonFailStreak` stops the workflow and exits 1.
 - [ ] `ReasonInterrupted` stops the workflow and exits 130.
 - [ ] After the last stage, the workflow cycles back if tasks remain and cycles are available.
 - [ ] Cycling stops when `max_cycles` is reached, even if tasks remain.
 - [ ] Cycling stops when no unchecked tasks remain in `IMPLEMENTATION_PLAN.md`.
 - [ ] Stage headers and workflow summary are printed to stderr.
-- [ ] `--notify` sends a notification on workflow completion.
+- [ ] `--notify` sends a notification on workflow completion and `.brr-failed` stops.
 - [ ] Path traversal (`..`) in the workflow name is rejected.
 - [ ] State file is written after each stage completes.
+- [ ] State file writes reject symlinks and other non-regular files.
 - [ ] Resuming from state file skips already-completed stages.
 - [ ] State file with mismatched workflow name is ignored (starts fresh).
 - [ ] State file with out-of-bounds stage index causes a fresh start.
