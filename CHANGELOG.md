@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.3] "Node Ahead" - 2026-04-26
+
+### Fixed
+
+- GitHub Actions CI and release workflows now opt into the Node.js 24 action runtime, matching the Pages workflow and avoiding Node.js 20 deprecation annotations
+
 ## [0.3.2] "Hard Edges" - 2026-04-26
 
 ### Changed
