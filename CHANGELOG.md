@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] "Hard Edges" - 2026-04-26
+
+### Changed
+
+- Build prompt failure handling now creates `.brr-failed` with validation details instead of discarding local changes after repeated validation failures
+
+### Fixed
+
+- Project config, named prompt, workflow file, and workflow state handling now reject symlinks and other non-regular files instead of following or overwriting them
+- `brr init` now writes `.gitignore` atomically and rejects symlinked `.brr/prompts` and `.brr/workflows` paths
+- Terminal colors are now enabled based on stderr TTY detection, matching where brr writes its own UI
+- Notifications now truncate UTF-8 content safely, and workflow `--notify` now sends a failure notification when `.brr-failed` stops a stage
+- README, specs, and landing page now document `.brr-failed` consistently
+
 ## [0.3.1] "Red Light, Green Light" - 2026-04-13
 
 ### Added
