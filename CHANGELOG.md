@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.4] "Clean Runners" - 2026-04-26
+
+### Fixed
+
+- GitHub Actions workflows now use Node.js 24-compatible action majors directly, removing Node.js 20 deprecation annotations from CI, release, and Pages runs
+
 ## [0.3.3] "Node Ahead" - 2026-04-26
 
 ### Fixed
