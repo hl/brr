@@ -21,12 +21,12 @@ func TestFormatComplete(t *testing.T) {
 func TestFormatApprovalWithContent(t *testing.T) {
 	title, body := format(&engine.Result{
 		Reason:          engine.ReasonApproval,
-		ApprovalContent: "Please review the migration plan",
+		ApprovalContent: "Approval details",
 	})
 	if title != "brr — approval needed" {
 		t.Errorf("unexpected title: %q", title)
 	}
-	if body != "Please review the migration plan" {
+	if body != "Approval details" {
 		t.Errorf("unexpected body: %q", body)
 	}
 }

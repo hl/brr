@@ -6,7 +6,7 @@
 # Prerequisite: create REQUIREMENTS.md with your feature description.
 #
 # Pipeline: spec -> plan -> build -> verify -> review
-# If verify or review find issues, cycles back to build (up to max_cycles).
+# If verify or review creates .brr-cycle, cycles back to build (up to max_cycles).
 
 stages:
   - prompt: spec

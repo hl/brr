@@ -33,6 +33,7 @@ const (
 	SignalComplete      = ".brr-complete"
 	SignalFailed        = ".brr-failed"
 	SignalNeedsApproval = ".brr-needs-approval"
+	SignalCycle         = ".brr-cycle"
 )
 
 // ErrInterrupted is returned when the engine is stopped by a user signal (Ctrl+C).
@@ -45,6 +46,7 @@ const (
 	ReasonComplete      StopReason = iota // .brr-complete signal file
 	ReasonFailed                          // .brr-failed signal file
 	ReasonApproval                        // .brr-needs-approval signal file
+	ReasonCycle                           // .brr-cycle signal file
 	ReasonMaxIterations                   // max iteration count reached
 	ReasonFailStreak                      // too many consecutive failures
 	ReasonInterrupted                     // user signal (Ctrl+C / SIGTERM)
@@ -88,6 +90,7 @@ func Run(opts Options) (*Result, error) {
 		removeIfRegular(SignalComplete)
 		removeIfRegular(SignalFailed)
 		removeIfRegular(SignalNeedsApproval)
+		removeIfRegular(SignalCycle)
 		return &Result{Reason: sig.reason, ApprovalContent: sig.approvalContent, FailedContent: sig.failedContent}, nil
 	}
 
@@ -95,11 +98,13 @@ func Run(opts Options) (*Result, error) {
 	removeIfRegular(SignalComplete)
 	removeIfRegular(SignalFailed)
 	removeIfRegular(SignalNeedsApproval)
+	removeIfRegular(SignalCycle)
 
 	// Clean up signal files on exit (only regular files — never delete dirs/symlinks)
 	defer func() { removeIfRegular(SignalComplete) }()
 	defer func() { removeIfRegular(SignalFailed) }()
 	defer func() { removeIfRegular(SignalNeedsApproval) }()
+	defer func() { removeIfRegular(SignalCycle) }()
 
 	// Track the currently running subprocess so we can forward signals
 	var mu sync.Mutex
@@ -305,7 +310,8 @@ type signalResult struct {
 	failedContent   string
 }
 
-// checkSignalFiles checks for .brr-complete, .brr-failed, and .brr-needs-approval.
+// checkSignalFiles checks for .brr-complete, .brr-failed, .brr-needs-approval,
+// and .brr-cycle.
 // Only regular files are treated as signals (symlinks and directories are ignored).
 // Returns nil if no signal file was found.
 func checkSignalFiles() *signalResult {
@@ -358,6 +364,10 @@ func checkSignalFiles() *signalResult {
 		fmt.Fprintf(os.Stderr, "\n  %s%s⏸ Task needs human approval%s (%s found):\n", ui.Bold, ui.Yellow, ui.Reset, SignalNeedsApproval)
 		fmt.Fprintf(os.Stderr, "  (could not read details: %v)\n", err)
 		return &signalResult{reason: ReasonApproval}
+	}
+	if fsutil.IsRegularFile(SignalCycle) {
+		fmt.Fprintf(os.Stderr, "\n  %s%s↻ Cycle requested%s (%s found). Stopping this stage.\n", ui.Bold, ui.Magenta, ui.Reset, SignalCycle)
+		return &signalResult{reason: ReasonCycle}
 	}
 	return nil
 }

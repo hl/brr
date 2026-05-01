@@ -12,6 +12,7 @@ and need a nudge when the loop ends and attention is required.
    - All tasks complete (`.brr-complete` signal file found)
    - Agent-reported failure (`.brr-failed` signal file found)
    - Human approval needed (`.brr-needs-approval` signal file found)
+   - Workflow cycle requested (`.brr-cycle` signal file found)
    - Too many consecutive failures (fail streak reaches the maximum)
    - Max iterations reached
 2. Each notification includes a title and body that identify which terminal

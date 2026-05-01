@@ -18,26 +18,22 @@ var workflowCmd = &cobra.Command{
 	Long: `Run a multi-stage workflow defined in .brr/workflows/<name>.yaml.
 
 Each stage runs the loop engine with its own prompt and iteration limit.
-After the final stage, the workflow cycles back to a designated stage if
-the prompts left unfinished work behind (detected via shared state files).
+The workflow cycles back to a designated stage when any stage creates
+.brr-cycle.
 
 Progress is saved to .brr-workflow-state.json after each stage. If the
 workflow is interrupted or paused for approval, re-running the same command
 resumes from where it left off. Use --reset to start from scratch.
 
-Example workflow (ship.yaml):
+Example workflow:
   stages:
-    - prompt: spec       # requirements -> spec
-      max: 3
-    - prompt: plan       # spec -> implementation plan
-      max: 5
-    - prompt: build      # implement one task per iteration
+    - prompt: prepare
+      max: 2
+    - prompt: work
       max: 100
-      cycle: true        # restart here if later stages find issues
-    - prompt: verify     # check against acceptance criteria
-      max: 3
-    - prompt: review     # audit changes for correctness
-      max: 1
+      cycle: true
+    - prompt: check
+      max: 2
   max_cycles: 3`,
 	Args:         cobra.ExactArgs(1),
 	RunE:         runWorkflow,

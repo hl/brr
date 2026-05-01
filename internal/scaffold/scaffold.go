@@ -99,9 +99,9 @@ func Init(force bool) error {
 	}
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "  Next steps:")
-	fmt.Fprintln(os.Stderr, "    1. Copy prompts to .brr/prompts/ (examples: https://github.com/hl/brr/tree/main/prompts)")
-	fmt.Fprintln(os.Stderr, "    2. Copy workflows to .brr/workflows/ (example: prompts/workflows/ship.yaml)")
-	fmt.Fprintln(os.Stderr, "    3. Run them: brr plan  or  brr workflow ship")
+	fmt.Fprintln(os.Stderr, "    1. Add prompts to .brr/prompts/")
+	fmt.Fprintln(os.Stderr, "    2. Add workflows to .brr/workflows/ if you want multi-stage runs")
+	fmt.Fprintln(os.Stderr, "    3. Run them: brr <prompt-name>  or  brr workflow <workflow-name>")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "  Docs: https://github.com/hl/brr")
 
@@ -169,6 +169,7 @@ var gitignoreEntries = []string{
 	".brr-complete",
 	".brr-failed",
 	".brr-needs-approval",
+	".brr-cycle",
 	".brr.lock",
 	".brr-workflow-state.json",
 }

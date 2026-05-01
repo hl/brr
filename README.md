@@ -22,16 +22,16 @@ git clone https://github.com/hl/brr && cd brr && make build
 
 ```bash
 # Run a prompt file in a loop
-brr prompts/build.md --max 20
+brr ./my-prompt.md --max 20
 
-# Named prompt (resolves to .brr/prompts/plan.md)
-brr plan --max 3
+# Named prompt (resolves to .brr/prompts/task.md)
+brr task --max 3
 
 # Inline prompt
 brr "Fix all TODO comments in src/" --max 5
 
 # Use a different profile
-brr plan --max 10 -p opus
+brr task --max 10 -p opus
 
 # Scaffold a project
 brr init
@@ -61,9 +61,9 @@ profiles:
 Each profile defines a `command` and its `args`. The prompt is piped to stdin. Switch profiles with `-p`:
 
 ```bash
-brr plan --max 10            # uses default (claude)
-brr plan --max 10 -p opus    # uses opus
-brr plan --max 10 -p codex   # uses codex
+brr task --max 10            # uses default (claude)
+brr task --max 10 -p opus    # uses opus
+brr task --max 10 -p codex   # uses codex
 ```
 
 Add your own profiles for any agent or configuration you want.
@@ -74,7 +74,7 @@ Add your own profiles for any agent or configuration you want.
 
 brr doesn't care what your prompt says — it just runs it over and over. Each iteration gets a fresh context window, so the prompt needs to be self-contained: orient, pick work, do it, commit.
 
-The repo includes [`plan`](prompts/plan.md) and [`build`](prompts/build.md) example prompts. Copy them to `.brr/prompts/` and adapt, or write your own from scratch for anything:
+The repo includes example prompts under [`prompts/`](prompts/). Copy them to `.brr/prompts/` and adapt, or write your own from scratch for anything:
 
 - Triage a backlog of issues
 - Run a migration across microservices
@@ -93,7 +93,7 @@ You are one iteration of a loop. Do one unit of work, then exit.
 5. If nothing left, create `.brr-complete` and exit
 ```
 
-Put prompts in `.brr/prompts/` (per-project) or `<os-config-dir>/brr/prompts/` (global). Then `brr plan` resolves to `.brr/prompts/plan.md`. Or point at any file: `brr ./my-prompt.md`.
+Put prompts in `.brr/prompts/` (per-project) or `<os-config-dir>/brr/prompts/` (global). Then `brr task` resolves to `.brr/prompts/task.md`. Or point at any file: `brr ./my-prompt.md`.
 
 ## How it works
 
@@ -104,6 +104,7 @@ The loop is controlled by signal files in the working directory:
 - **`.brr-complete`** — the agent creates this when all work is finished. brr detects it, stops the loop, and removes the file.
 - **`.brr-failed`** — the agent creates this when it hits a blocker or cannot recover after retrying. brr stops the loop and prints the file contents (up to 4 KiB). Investigate the failure, delete the file, and re-run.
 - **`.brr-needs-approval`** — the agent creates this when it needs a human decision. brr stops the loop and prints the file contents (up to 4 KiB). Resolve the issue, delete the file, and re-run.
+- **`.brr-cycle`** — inside `brr workflow`, the agent creates this when a later stage found more work and the workflow should restart from the stage marked `cycle: true`.
 - **`.brr.lock`** — prevents multiple brr instances from running in the same directory. Acquired on start, released on exit. The file stays on disk between runs (this is intentional). Added to `.gitignore` by `brr init`.
 
 Three consecutive failures also stop the loop automatically.

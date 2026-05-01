@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.5] "Agnostic Cycles" - 2026-05-01
+
+### Added
+
+- `.brr-cycle` signal file for workflows, allowing prompts to request another pass without brr inspecting task markdown files
+- `make check` now runs `govulncheck` for reachable dependency vulnerabilities
+
+### Fixed
+
+- Corrupt workflow state with invalid stage or cycle indexes is ignored instead of panicking during resume
+- Prompt file resolution now rejects unsafe direct prompt files consistently and applies the 10 MiB prompt size limit to named prompts
+- Plain `brr <prompt>` runs now reject `.brr-cycle` instead of treating workflow-only cycle requests as successful stops
+- The repository `.gitignore` now matches `brr init` output for local brr signal, lock, and workflow state files
+
 ## [0.3.4] "Clean Runners" - 2026-04-26
 
 ### Fixed

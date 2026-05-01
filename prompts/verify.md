@@ -23,7 +23,7 @@ You are one iteration of a verification loop. Check the implementation against s
   ```
   If `IMPLEMENTATION_PLAN.md` already has tasks, append — don't overwrite.
   Commit: `docs(plan): verification findings`
-  Create `.brr-complete`
+  Create `.brr-cycle`
 
 ## Rules
 

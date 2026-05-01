@@ -54,6 +54,29 @@ profiles:
 	}
 }
 
+func writeCycleConfig(t *testing.T) {
+	t.Helper()
+	var yaml string
+	if runtime.GOOS == "windows" {
+		yaml = `default: test
+profiles:
+  test:
+    command: cmd
+    args: ["/c", "echo again > .brr-cycle"]
+`
+	} else {
+		yaml = `default: test
+profiles:
+  test:
+    command: "touch"
+    args: [".brr-cycle"]
+`
+	}
+	if err := os.WriteFile(".brr.yaml", []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRunIntegrationSuccess(t *testing.T) {
 	t.Chdir(t.TempDir())
 	writeTestConfig(t)
@@ -176,6 +199,21 @@ func TestRunIntegrationPromptFromFile(t *testing.T) {
 	}
 }
 
+func TestRunIntegrationCycleSignalWithoutWorkflowErrors(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeCycleConfig(t)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"hello", "-m", "1"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for .brr-cycle outside workflow")
+	}
+	if !strings.Contains(err.Error(), "only supported by 'brr workflow'") {
+		t.Fatalf("expected workflow-only cycle error, got: %v", err)
+	}
+}
+
 func TestRunIntegrationNoArgs(t *testing.T) {
 	t.Chdir(t.TempDir())
 	writeTestConfig(t)
@@ -213,7 +251,7 @@ func TestPrintConfigFormatting(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
-	printConfig("plan", "claude", []string{"claude", "-p"}, 0)
+	printConfig("task", "claude", []string{"claude", "-p"}, 0)
 
 	w.Close()
 	os.Stderr = old
@@ -222,7 +260,7 @@ func TestPrintConfigFormatting(t *testing.T) {
 	n, _ := r.Read(buf)
 	output := string(buf[:n])
 
-	if !strings.Contains(output, "plan") {
+	if !strings.Contains(output, "task") {
 		t.Error("expected prompt name in output")
 	}
 	if !strings.Contains(output, "claude") {
@@ -238,7 +276,7 @@ func TestPrintConfigWithMax(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
-	printConfig("plan", "claude", []string{"claude"}, 5)
+	printConfig("task", "claude", []string{"claude"}, 5)
 
 	w.Close()
 	os.Stderr = old

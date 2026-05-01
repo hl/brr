@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The workflow command orchestrates multi-stage brr pipelines. Each stage runs the loop engine with a specific prompt and iteration limit. Stages execute sequentially and coordinate through shared state files (primarily `IMPLEMENTATION_PLAN.md`). After the final stage, the workflow can cycle back to a designated stage if unfinished tasks remain, enabling autonomous build-verify-review loops.
+The workflow command orchestrates multi-stage brr pipelines. Each stage runs the loop engine with a configured prompt and iteration limit. Stages execute sequentially. Any stage can request another pass by creating `.brr-cycle`, and the workflow then cycles back to the stage marked `cycle: true`.
 
 ## Requirements
 
@@ -23,8 +23,8 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
     - `ReasonApproval`: stop the workflow, print the approval content, exit with code 0.
     - `ReasonFailStreak`: stop the workflow with an error.
     - `ReasonInterrupted`: stop the workflow, exit with code 130.
-11. After the final stage completes successfully, the workflow checks whether `IMPLEMENTATION_PLAN.md` exists and contains at least one unchecked task (a line matching `- [ ] `). If tasks remain and a stage with `cycle: true` exists and the cycle count has not reached `max_cycles`, the workflow increments the cycle counter and restarts from the cycle stage. Otherwise, the workflow exits successfully.
-12. The cycle check uses a simple string search for `- [ ] ` (with the trailing space) in `IMPLEMENTATION_PLAN.md`. If the file does not exist or cannot be read, no tasks remain.
+11. If any stage exits because `.brr-cycle` was created, and a stage with `cycle: true` exists, and the cycle count has not reached `max_cycles`, the workflow increments the cycle counter and restarts from the cycle stage.
+12. If `.brr-cycle` is created with no configured cycle stage, or after `max_cycles` is reached, the workflow exits with an error.
 13. On startup, the workflow prints the banner, then a workflow summary: name, number of stages, max cycles, and the list of stages with their prompts and limits. All workflow output goes to stderr.
 14. The `--profile` flag on the workflow command sets a default profile for all stages. Per-stage `profile` in the YAML overrides this. If neither is set, the config default applies.
 15. The `--notify` flag sends a desktop notification when the workflow completes successfully, stops due to `.brr-failed`, or stops due to error (not per-stage). Approval pauses and interrupts do not trigger notifications.
@@ -34,7 +34,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 19. When the workflow completes successfully (all stages done, no more cycles), the state file is deleted.
 20. On error, approval pause, or interrupt, the state file is preserved so the next run resumes from the last checkpoint.
 21. The `--reset` flag deletes the state file before starting, forcing a fresh run from stage 1.
-22. The state file's `start_sha` field records `git rev-parse HEAD` at the time the workflow first starts (not on resume). This allows prompts (e.g., the review prompt) to determine the diff base.
+22. The state file's `start_sha` field records `git rev-parse HEAD` at the time the workflow first starts (not on resume). This allows prompts for prompt-owned follow-up logic to determine the diff base.
 
 ## Constraints
 
@@ -42,7 +42,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 - The workflow must work on Linux, macOS, and Windows.
 - Workflow resolution must reject path traversal (`..`) in the name argument, consistent with prompt resolution.
 - Workflow resolution and state persistence must not follow symlinks.
-- The workflow must not modify `IMPLEMENTATION_PLAN.md` itself. Only the agent (via prompts) modifies shared state files.
+- The workflow must not inspect or modify prompt-owned state. Prompts decide when to create `.brr-complete`, `.brr-failed`, `.brr-needs-approval`, or `.brr-cycle`.
 
 ## Dependencies
 
@@ -55,7 +55,7 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 
 ## Acceptance Criteria
 
-- [ ] `brr workflow ship` loads and executes `.brr/workflows/ship.yaml`.
+- [ ] `brr workflow <name>` loads and executes `.brr/workflows/<name>.yaml`.
 - [ ] Workflow file resolution searches project then user config directory.
 - [ ] Workflow file resolution rejects symlinks and other non-regular files.
 - [ ] Missing workflow file returns an error listing both searched paths.
@@ -68,9 +68,9 @@ The workflow command orchestrates multi-stage brr pipelines. Each stage runs the
 - [ ] `ReasonFailed` stops the workflow, preserves state, and exits 0.
 - [ ] `ReasonFailStreak` stops the workflow and exits 1.
 - [ ] `ReasonInterrupted` stops the workflow and exits 130.
-- [ ] After the last stage, the workflow cycles back if tasks remain and cycles are available.
-- [ ] Cycling stops when `max_cycles` is reached, even if tasks remain.
-- [ ] Cycling stops when no unchecked tasks remain in `IMPLEMENTATION_PLAN.md`.
+- [ ] `.brr-cycle` cycles back to the configured cycle stage when cycles are available.
+- [ ] `.brr-cycle` returns an error when no cycle stage is configured.
+- [ ] `.brr-cycle` returns an error when `max_cycles` is reached.
 - [ ] Stage headers and workflow summary are printed to stderr.
 - [ ] `--notify` sends a notification on workflow completion and `.brr-failed` stops.
 - [ ] Path traversal (`..`) in the workflow name is rejected.

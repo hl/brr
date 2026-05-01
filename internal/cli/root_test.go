@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,19 +39,19 @@ func TestResolvePromptFromFile(t *testing.T) {
 func TestResolvePromptDirectoryFallsThrough(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// Create a directory named "plan" AND a named prompt .brr/prompts/plan.md
-	if err := os.Mkdir("plan", 0o755); err != nil {
+	// Create a directory named "task" AND a named prompt .brr/prompts/task.md
+	if err := os.Mkdir("task", 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(".brr", "prompts"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(".brr", "prompts", "plan.md"), []byte("named prompt"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(".brr", "prompts", "task.md"), []byte("named prompt"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Should skip the directory and resolve the named prompt
-	text, err := resolvePrompt("plan")
+	text, err := resolvePrompt("task")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -65,15 +66,15 @@ func TestResolvePromptNamedFromProject(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(".brr", "prompts"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(".brr", "prompts", "plan.md"), []byte("planning prompt"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(".brr", "prompts", "task.md"), []byte("task prompt"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	text, err := resolvePrompt("plan")
+	text, err := resolvePrompt("task")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if text != "planning prompt" {
+	if text != "task prompt" {
 		t.Errorf("expected named prompt content, got %q", text)
 	}
 }
@@ -192,7 +193,7 @@ func TestLooksLikeFilePathWithExtension(t *testing.T) {
 }
 
 func TestLooksLikeFilePathPlainName(t *testing.T) {
-	if looksLikeFilePath("plan") {
+	if looksLikeFilePath("task") {
 		t.Error("expected false for plain name without extension")
 	}
 }
@@ -242,17 +243,33 @@ func TestResolvePromptDirectFileSymlinkRejected(t *testing.T) {
 		t.Skip("symlinks not supported")
 	}
 
-	// Should not read through the symlink — should fall through to inline
-	text, err := resolvePrompt("prompt-link.md")
-	if err != nil {
-		// It's a .md file that exists (as a symlink), so looksLikeFilePath is true
-		// and Lstat succeeds. Since it's not a regular file, it falls through.
-		// But looksLikeFilePath would match, so it errors with "not found" type message.
-		// This is acceptable — symlink .md files get rejected.
-		return
+	// Should not read through the symlink or treat it as inline prompt text.
+	_, err := resolvePrompt("prompt-link.md")
+	if err == nil {
+		t.Fatal("expected symlink prompt file to be rejected")
 	}
-	if text == "secret" {
-		t.Error("symlink prompt file should not be read")
+	if !strings.Contains(err.Error(), "not a regular file") {
+		t.Fatalf("expected regular-file error, got: %v", err)
+	}
+}
+
+func TestResolvePromptNamedFileTooLarge(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.MkdirAll(filepath.Join(".brr", "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	large := bytes.Repeat([]byte("x"), maxPromptFileSize+1)
+	if err := os.WriteFile(filepath.Join(".brr", "prompts", "huge.md"), large, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := resolvePrompt("huge")
+	if err == nil {
+		t.Fatal("expected oversized named prompt to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("expected size error, got: %v", err)
 	}
 }
 
@@ -261,7 +278,7 @@ func TestResolvePromptPathWithSeparator(t *testing.T) {
 
 	// A path-like string with separators but no recognized extension
 	// should error, not become inline text
-	_, err := resolvePrompt("prompts/build")
+	_, err := resolvePrompt("prompts/task")
 	if err == nil {
 		t.Error("expected error for path-like argument without extension")
 	}

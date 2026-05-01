@@ -37,6 +37,8 @@ func format(result *engine.Result) (title, body string) {
 			body = "A task needs human approval."
 		}
 		return title, body
+	case engine.ReasonCycle:
+		return "brr — cycle requested", "A workflow stage requested another cycle."
 	case engine.ReasonMaxIterations:
 		return "brr — max iterations", "Maximum iteration count reached."
 	case engine.ReasonFailStreak:

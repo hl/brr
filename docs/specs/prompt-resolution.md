@@ -8,7 +8,7 @@ Prompt resolution determines how a user-provided prompt argument is interpreted 
 
 1. Resolution follows a strict priority order: existing regular file > named prompt > inline text. The first match wins.
 2. The argument is first checked against the filesystem via `lstat()`. If it matches a regular file on disk, its contents are read and used as the prompt text -- regardless of whether it looks like a file path syntactically.
-3. File path resolution rejects symlinks, directories, FIFOs, and other non-regular files. These fall through to named prompt or inline text resolution.
+3. File path resolution rejects symlinks, FIFOs, and other non-regular files. Directories fall through to named prompt or inline text resolution.
 4. Prompt files larger than 10 MiB are rejected with an error.
 5. If the argument does not match an existing file, but looks like a file path (contains a path separator or has a recognized extension: `.md`, `.txt`, `.prompt`; when the argument contains spaces, both a path separator and a recognized extension are required), the system reports a "file not found" error rather than falling through.
 6. When the argument has no spaces and did not match an existing file or trigger a file-not-found error, it is treated as a named prompt. Named prompts are looked up in `.brr/prompts/<name>.md` (project-local) then the user-global prompt directory: `~/.config/brr/prompts/<name>.md` on Linux, `~/Library/Application Support/brr/prompts/<name>.md` on macOS, `%AppData%\brr\prompts\<name>.md` on Windows (matching the OS conventions in `docs/specs/configuration.md` requirement 2). The first regular file found wins.
@@ -31,7 +31,8 @@ Prompt resolution determines how a user-provided prompt argument is interpreted 
 
 - [ ] Inline text passes through unchanged.
 - [ ] A valid file path returns the file's contents.
-- [ ] Direct symlinks, directories, and FIFOs fall through to the next resolution stage without being read.
+- [ ] Direct symlinks and FIFOs are rejected without being read.
+- [ ] Direct directories fall through to the next resolution stage without being read.
 - [ ] Named prompts resolve from project-local before user-global.
 - [ ] Symlinks and other non-regular files at named prompt paths are rejected.
 - [ ] Path traversal (`..`) in named prompts is rejected.

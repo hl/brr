@@ -38,8 +38,6 @@ type Options struct {
 	Reset         bool                         // discard saved state and start fresh
 }
 
-const planFile = "IMPLEMENTATION_PLAN.md"
-
 const StateFile = ".brr-workflow-state.json"
 
 type State struct {
@@ -132,7 +130,7 @@ func Run(opts Options) (*engine.Result, error) {
 	if opts.Reset {
 		deleteState()
 	} else if saved, err := loadState(); err == nil && saved.Workflow == opts.Name {
-		if saved.Stage < len(stages) {
+		if validResumeState(saved, len(stages), opts.Workflow.MaxCycles) {
 			stageIdx = saved.Stage
 			cycle = saved.Cycle
 			startSHA = saved.StartSHA
@@ -204,20 +202,26 @@ func Run(opts Options) (*engine.Result, error) {
 			return result, nil
 		}
 
-		stageIdx++
-
-		// After the last stage: check for cycle
-		if stageIdx >= len(stages) && cycleStart >= 0 {
-			if hasUnfinishedTasks() && cycle < opts.Workflow.MaxCycles {
-				cycle++
-				stageIdx = cycleStart
-				fmt.Fprintf(os.Stderr, "\n%s━━━%s %s%sCycle %d/%d%s %s▸ tasks remain, restarting from %s ━━━%s\n",
-					ui.Dim, ui.Reset,
-					ui.Bold, ui.Magenta, cycle, opts.Workflow.MaxCycles, ui.Reset,
-					ui.Dim, stages[cycleStart].Prompt, ui.Reset,
-				)
+		if result != nil && result.Reason == engine.ReasonCycle {
+			if cycleStart < 0 {
+				return result, fmt.Errorf("stage %d (%s): requested a workflow cycle, but no stage has cycle: true", stageIdx+1, stage.Prompt)
 			}
+			if cycle >= opts.Workflow.MaxCycles {
+				fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow stopped — max_cycles %d reached%s\n", ui.Bold, ui.Red, opts.Workflow.MaxCycles, ui.Reset)
+				return result, fmt.Errorf("stage %d (%s): requested another workflow cycle after max_cycles %d", stageIdx+1, stage.Prompt, opts.Workflow.MaxCycles)
+			}
+			cycle++
+			stageIdx = cycleStart
+			fmt.Fprintf(os.Stderr, "\n%s━━━%s %s%sCycle %d/%d%s %s▸ restarting from %s ━━━%s\n",
+				ui.Dim, ui.Reset,
+				ui.Bold, ui.Magenta, cycle, opts.Workflow.MaxCycles, ui.Reset,
+				ui.Dim, stages[cycleStart].Prompt, ui.Reset,
+			)
+			trySaveState(&State{Workflow: opts.Name, Stage: stageIdx, Cycle: cycle, StartSHA: startSHA})
+			continue
 		}
+
+		stageIdx++
 
 		// Persist progress: next stage to run
 		trySaveState(&State{Workflow: opts.Name, Stage: stageIdx, Cycle: cycle, StartSHA: startSHA})
@@ -226,17 +230,17 @@ func Run(opts Options) (*engine.Result, error) {
 	// Workflow done — clean up state file
 	deleteState()
 
-	if hasUnfinishedTasks() {
-		fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow complete — unresolved tasks remain in %s%s\n", ui.Bold, ui.Yellow, planFile, ui.Reset)
-	} else {
-		fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow complete%s\n", ui.Bold, ui.Green, ui.Reset)
-	}
+	fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow complete%s\n", ui.Bold, ui.Green, ui.Reset)
 
 	if opts.Notify != nil {
 		opts.Notify()
 	}
 
 	return &engine.Result{Reason: engine.ReasonComplete}, nil
+}
+
+func validResumeState(s *State, stageCount, maxCycles int) bool {
+	return s.Stage >= 0 && s.Stage < stageCount && s.Cycle >= 0 && s.Cycle <= maxCycles
 }
 
 func loadState() (*State, error) {
@@ -318,14 +322,6 @@ func gitHEAD() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
-}
-
-func hasUnfinishedTasks() bool {
-	data, err := os.ReadFile(planFile)
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(data), "- [ ] ")
 }
 
 func printWorkflowSummary(opts Options) {

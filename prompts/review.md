@@ -34,7 +34,7 @@ Only report findings that:
   ```
   If `IMPLEMENTATION_PLAN.md` already has tasks, append — don't overwrite.
   Commit: `docs(plan): review findings`
-  Create `.brr-complete`
+  Create `.brr-cycle`
 
 ## Rules
 

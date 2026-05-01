@@ -46,7 +46,7 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		t.Fatal("expected .gitignore to exist")
 	}
-	for _, entry := range []string{".brr-complete", ".brr-failed", ".brr-needs-approval"} {
+	for _, entry := range gitignoreEntries {
 		if !strings.Contains(string(gitignore), entry) {
 			t.Errorf("expected %q in .gitignore", entry)
 		}
@@ -83,7 +83,7 @@ func TestInitGitignoreAppendsToExisting(t *testing.T) {
 func TestInitGitignoreSkipsExistingEntries(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-failed\n.brr-needs-approval\n.brr.lock\n.brr-workflow-state.json\n"), 0o644); err != nil {
+	if err := os.WriteFile(".gitignore", []byte(".brr-complete\n.brr-failed\n.brr-needs-approval\n.brr-cycle\n.brr.lock\n.brr-workflow-state.json\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -253,7 +253,7 @@ func TestInitGitignoreCommentedEntriesNotMatched(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Commented-out entries should not prevent real entries from being added
-	if err := os.WriteFile(".gitignore", []byte("# .brr-complete\n# .brr-needs-approval\n"), 0o644); err != nil {
+	if err := os.WriteFile(".gitignore", []byte("# .brr-complete\n# .brr-needs-approval\n# .brr-cycle\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -277,11 +277,13 @@ func TestInitGitignoreCommentedEntriesNotMatched(t *testing.T) {
 	realEntries := 0
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == ".brr-complete" || trimmed == ".brr-needs-approval" {
-			realEntries++
+		for _, entry := range gitignoreEntries {
+			if trimmed == entry {
+				realEntries++
+			}
 		}
 	}
-	if realEntries != 2 {
-		t.Errorf("expected 2 real gitignore entries, got %d", realEntries)
+	if realEntries != len(gitignoreEntries) {
+		t.Errorf("expected %d real gitignore entries, got %d", len(gitignoreEntries), realEntries)
 	}
 }

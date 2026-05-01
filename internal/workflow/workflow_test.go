@@ -15,12 +15,12 @@ import (
 func TestLoadValidWorkflow(t *testing.T) {
 	data := []byte(`
 stages:
-  - prompt: spec
+  - prompt: alpha
     max: 3
-  - prompt: build
+  - prompt: work
     max: 100
     cycle: true
-  - prompt: review
+  - prompt: check
     max: 1
 max_cycles: 5
 `)
@@ -42,7 +42,7 @@ max_cycles: 5
 func TestLoadDefaultMaxCycles(t *testing.T) {
 	data := []byte(`
 stages:
-  - prompt: build
+  - prompt: work
     max: 10
 `)
 	wf, err := Load(data)
@@ -83,7 +83,7 @@ stages:
 func TestLoadZeroMax(t *testing.T) {
 	data := []byte(`
 stages:
-  - prompt: build
+  - prompt: work
     max: 0
 `)
 	_, err := Load(data)
@@ -98,10 +98,10 @@ stages:
 func TestLoadMultipleCycleStages(t *testing.T) {
 	data := []byte(`
 stages:
-  - prompt: build
+  - prompt: work
     max: 10
     cycle: true
-  - prompt: verify
+  - prompt: inspect
     max: 3
     cycle: true
 `)
@@ -129,16 +129,16 @@ func TestResolveProjectPath(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	content := "stages:\n  - prompt: build\n    max: 1\n"
-	if err := os.WriteFile(filepath.Join(dir, "ship.yaml"), []byte(content), 0o644); err != nil {
+	content := "stages:\n  - prompt: work\n    max: 1\n"
+	if err := os.WriteFile(filepath.Join(dir, "example.yaml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	data, err := Resolve("ship")
+	data, err := Resolve("example")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(string(data), "build") {
+	if !strings.Contains(string(data), "work") {
 		t.Error("expected workflow content")
 	}
 }
@@ -172,52 +172,27 @@ func TestResolveProjectWorkflowSymlinkRejected(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(t.TempDir(), "ship.yaml")
-	if err := os.WriteFile(target, []byte("stages:\n  - prompt: build\n    max: 1\n"), 0o644); err != nil {
+	target := filepath.Join(t.TempDir(), "example.yaml")
+	if err := os.WriteFile(target, []byte("stages:\n  - prompt: work\n    max: 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, filepath.Join(dir, "ship.yaml")); err != nil {
+	if err := os.Symlink(target, filepath.Join(dir, "example.yaml")); err != nil {
 		t.Skip("symlinks not supported")
 	}
 
-	_, err := Resolve("ship")
+	_, err := Resolve("example")
 	if err == nil {
 		t.Fatal("expected symlinked workflow to be rejected")
 	}
-	if !strings.Contains(err.Error(), filepath.Join(".brr", "workflows", "ship.yaml")) {
+	if !strings.Contains(err.Error(), filepath.Join(".brr", "workflows", "example.yaml")) {
 		t.Errorf("expected error to mention workflow path, got: %v", err)
-	}
-}
-
-func TestHasUnfinishedTasks(t *testing.T) {
-	t.Chdir(t.TempDir())
-
-	// No file — no tasks
-	if hasUnfinishedTasks() {
-		t.Error("expected no tasks when file doesn't exist")
-	}
-
-	// File with unchecked tasks
-	if err := os.WriteFile(planFile, []byte("- [ ] **1.1 — Task** — files: foo.go\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if !hasUnfinishedTasks() {
-		t.Error("expected unfinished tasks")
-	}
-
-	// File with all tasks done (no unchecked marker)
-	if err := os.WriteFile(planFile, []byte("All done!\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if hasUnfinishedTasks() {
-		t.Error("expected no unfinished tasks")
 	}
 }
 
 func TestRunSequentialStages(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// Each stage command appends its prompt to a log file so we can verify order
+	// Each stage command appends its prompt to a log file so we can inspect order
 	logFile := filepath.Join(".", "stage-log")
 	var cmd []string
 	if runtime.GOOS == "windows" {
@@ -274,42 +249,40 @@ func TestRunSequentialStages(t *testing.T) {
 	}
 }
 
-func TestRunCycleOnUnfinishedTasks(t *testing.T) {
+func TestRunCycleOnSignal(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	// Stage 1 (cycle point): creates a counter file
-	// Stage 2: creates IMPLEMENTATION_PLAN.md with a task on the first pass,
-	//          removes it on the second pass
+	// Stage 2: requests one cycle on the first pass, then finishes.
 	counter := filepath.Join(".", "cycle-counter")
 	var buildCmd, reviewCmd []string
 	if runtime.GOOS == "windows" {
 		buildCmd = []string{"cmd", "/c", "echo x >> " + counter}
 		reviewCmd = []string{"cmd", "/c",
-			"if exist " + counter + " (findstr /c:\"xx\" " + counter + " >nul 2>&1 && (echo done > " + planFile + ") || (echo - [ ] fix > " + planFile + "))"}
+			"if exist " + counter + " (findstr /c:\"xx\" " + counter + " >nul 2>&1 || echo again > .brr-cycle)"}
 	} else {
 		buildCmd = []string{"sh", "-c", "echo x >> " + counter}
-		// First call: creates plan with task. Second call: lines >= 2 → clears the plan.
 		reviewCmd = []string{"sh", "-c",
-			`lines=$(wc -l < ` + counter + ` | tr -d ' '); if [ "$lines" -ge 2 ]; then echo "done" > ` + planFile + `; else echo "- [ ] fix" > ` + planFile + `; fi`}
+			`lines=$(wc -l < ` + counter + ` | tr -d ' '); if [ "$lines" -lt 2 ]; then touch .brr-cycle; fi`}
 	}
 
 	wf := Workflow{
 		Stages: []Stage{
-			{Prompt: "build", Max: 1, Cycle: true},
-			{Prompt: "review", Max: 1},
+			{Prompt: "work", Max: 1, Cycle: true},
+			{Prompt: "check", Max: 1},
 		},
 		MaxCycles: 3,
 	}
 
 	cfg := config.Config{
-		Default: "build",
+		Default: "work",
 		Profiles: map[string]config.Profile{
-			"build":  {Command: buildCmd[0], Args: buildCmd[1:]},
-			"review": {Command: reviewCmd[0], Args: reviewCmd[1:]},
+			"work":  {Command: buildCmd[0], Args: buildCmd[1:]},
+			"check": {Command: reviewCmd[0], Args: reviewCmd[1:]},
 		},
 	}
 
-	wf.Stages[1].Profile = "review"
+	wf.Stages[1].Profile = "check"
 
 	_, err := Run(Options{
 		Name:     "test",
@@ -323,14 +296,46 @@ func TestRunCycleOnUnfinishedTasks(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should have run build twice (initial + one cycle)
+	// Should have run work twice (initial + one cycle)
 	data, err := os.ReadFile(counter)
 	if err != nil {
 		t.Fatal("counter not created")
 	}
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(lines) != 2 {
-		t.Errorf("expected 2 build iterations (initial + cycle), got %d", len(lines))
+		t.Errorf("expected 2 work iterations (initial + cycle), got %d", len(lines))
+	}
+}
+
+func TestRunCycleSignalWithoutCycleStageErrors(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "echo again > .brr-cycle"}
+	} else {
+		cmd = []string{"sh", "-c", "touch .brr-cycle"}
+	}
+
+	wf := Workflow{
+		Stages:    []Stage{{Prompt: "check", Max: 1}},
+		MaxCycles: 1,
+	}
+	cfg := makeTestCfg(cmd)
+
+	_, err := Run(Options{
+		Name:     "test",
+		Workflow: wf,
+		Config:   cfg,
+		ResolvePrompt: func(name string) (string, error) {
+			return name + "\n", nil
+		},
+	})
+	if err == nil {
+		t.Fatal("expected cycle signal without cycle stage to fail")
+	}
+	if !strings.Contains(err.Error(), "no stage has cycle: true") {
+		t.Fatalf("expected missing cycle stage error, got: %v", err)
 	}
 }
 
@@ -535,18 +540,18 @@ func TestRunFailStreakStopsWorkflow(t *testing.T) {
 func TestRunMaxCyclesLimit(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// Stage always creates a plan with tasks — should stop after max_cycles
+	// Stage always requests another cycle — should stop after max_cycles.
 	counter := filepath.Join(".", "cycle-counter")
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & echo - [ ] task > " + planFile}
+		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & echo again > .brr-cycle"}
 	} else {
-		cmd = []string{"sh", "-c", "echo x >> " + counter + " && echo '- [ ] task' > " + planFile}
+		cmd = []string{"sh", "-c", "echo x >> " + counter + " && touch .brr-cycle"}
 	}
 
 	wf := Workflow{
 		Stages: []Stage{
-			{Prompt: "build", Max: 1, Cycle: true},
+			{Prompt: "work", Max: 1, Cycle: true},
 		},
 		MaxCycles: 2,
 	}
@@ -564,8 +569,11 @@ func TestRunMaxCyclesLimit(t *testing.T) {
 			return "go", nil
 		},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected max_cycles error")
+	}
+	if !strings.Contains(err.Error(), "max_cycles 2") {
+		t.Fatalf("expected max_cycles error, got: %v", err)
 	}
 
 	// Should have run 1 (initial) + 2 (cycles) = 3 times
@@ -582,10 +590,10 @@ func TestRunMaxCyclesLimit(t *testing.T) {
 func TestLoadPerStageProfile(t *testing.T) {
 	data := []byte(`
 stages:
-  - prompt: build
+  - prompt: work
     max: 10
     profile: opus
-  - prompt: review
+  - prompt: check
     max: 1
 `)
 	wf, err := Load(data)
@@ -756,6 +764,46 @@ func TestResumeOutOfBoundsStartsFresh(t *testing.T) {
 	}
 }
 
+func TestResumeNegativeStageStartsFresh(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	logFile := filepath.Join(".", "stage-log")
+	var cmd []string
+	if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", "set /p x= & echo %x% >> " + logFile}
+	} else {
+		cmd = []string{"sh", "-c", "cat >> " + logFile}
+	}
+
+	wf := Workflow{
+		Stages:    []Stage{{Prompt: "only", Max: 1}},
+		MaxCycles: 1,
+	}
+	cfg := makeTestCfg(cmd)
+
+	trySaveState(&State{Workflow: "test", Stage: -1, Cycle: 0, StartSHA: "abc"})
+
+	_, err := Run(Options{
+		Name:     "test",
+		Workflow: wf,
+		Config:   cfg,
+		ResolvePrompt: func(name string) (string, error) {
+			return name + "\n", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatal("log not created")
+	}
+	if !strings.Contains(string(data), "only") {
+		t.Error("expected stage to run after invalid state reset")
+	}
+}
+
 func TestResetFlag(t *testing.T) {
 	t.Chdir(t.TempDir())
 
@@ -810,7 +858,7 @@ func TestStateDeletedOnCompletion(t *testing.T) {
 
 	cmd := echoCmd()
 	wf := Workflow{
-		Stages:    []Stage{{Prompt: "build", Max: 1}},
+		Stages:    []Stage{{Prompt: "work", Max: 1}},
 		MaxCycles: 1,
 	}
 	cfg := makeTestCfg(cmd)
@@ -866,8 +914,8 @@ func TestStatePreservedOnFailStreak(t *testing.T) {
 func TestStateContents(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// Write state, read it back, verify fields
-	want := &State{Workflow: "ship", Stage: 2, Cycle: 1, StartSHA: "abc123"}
+	// Write state, read it back, inspect fields
+	want := &State{Workflow: "example", Stage: 2, Cycle: 1, StartSHA: "abc123"}
 	trySaveState(want)
 
 	got, err := loadState()
@@ -960,15 +1008,14 @@ func TestResumeWithCycleState(t *testing.T) {
 
 	wf := Workflow{
 		Stages: []Stage{
-			{Prompt: "build", Max: 1, Cycle: true},
-			{Prompt: "verify", Max: 1},
+			{Prompt: "work", Max: 1, Cycle: true},
+			{Prompt: "inspect", Max: 1},
 		},
 		MaxCycles: 3,
 	}
 	cfg := makeTestCfg(cmd)
 
-	// Resume at stage 1 (verify), cycle 2 — should run verify then be done
-	// (no tasks remain since we didn't create IMPLEMENTATION_PLAN.md)
+	// Resume at stage 1 (inspect), cycle 2 — should run inspect then be done.
 	trySaveState(&State{Workflow: "test", Stage: 1, Cycle: 2, StartSHA: "abc"})
 
 	_, err := Run(Options{
@@ -983,13 +1030,13 @@ func TestResumeWithCycleState(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Only verify (1 stage) should have run
+	// Only inspect (1 stage) should have run
 	data, err := os.ReadFile(counter)
 	if err != nil {
 		t.Fatal("counter not created")
 	}
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(lines) != 1 {
-		t.Errorf("expected 1 iteration (just verify), got %d", len(lines))
+		t.Errorf("expected 1 iteration (just inspect), got %d", len(lines))
 	}
 }

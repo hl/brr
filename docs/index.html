@@ -100,11 +100,11 @@ workflow    Run a multi-stage workflow</code></pre>
             <div class="inline-grid inline-grid-3">
               <div class="inline-card">
                 <p class="label">run a prompt file</p>
-                <pre><code>brr prompts/build.md --max 20</code></pre>
+                <pre><code>brr ./my-prompt.md --max 20</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">resolve a named prompt</p>
-                <pre><code>brr plan --max 3</code></pre>
+                <pre><code>brr task --max 3</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">inline prompt</p>
@@ -112,15 +112,15 @@ workflow    Run a multi-stage workflow</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">notify when done</p>
-                <pre><code>brr build --max 20 --notify</code></pre>
+                <pre><code>brr task --max 20 --notify</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">run a workflow</p>
-                <pre><code>brr workflow ship</code></pre>
+                <pre><code>brr workflow release</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">restart a workflow</p>
-                <pre><code>brr workflow ship --reset</code></pre>
+                <pre><code>brr workflow release --reset</code></pre>
               </div>
             </div>
           </section>
@@ -156,13 +156,13 @@ profiles:
           </section>
 
           <section class="terminal-block" id="workflows">
-            <p class="section-kicker">$ cat .brr/workflows/ship.yaml</p>
+            <p class="section-kicker">$ cat .brr/workflows/release.yaml</p>
             <div class="config-layout">
               <div class="copy-block">
                 <p>
                   Workflows turn brr into an autonomous agentic pipeline. Define stages, point each
-                  at a prompt, and let the cycle-back loop close the feedback gap — build, verify,
-                  fix, repeat. Pair with pre-commit hooks or CI checks and the agent doesn't just
+                  at a prompt, and let the cycle-back loop close the feedback gap. Pair with
+                  pre-commit hooks or CI checks and the agent doesn't just
                   think it's done, something external proves it.
                 </p>
                 <p>
@@ -172,17 +172,13 @@ profiles:
                 </p>
               </div>
               <pre class="config-block"><code>stages:
-  - prompt: spec       # requirements -> spec
-    max: 3
-  - prompt: plan       # spec -> implementation plan
-    max: 5
-  - prompt: build      # implement one task per iteration
+  - prompt: prepare
+    max: 2
+  - prompt: work
     max: 100
-    cycle: true        # restart here if later stages find issues
-  - prompt: verify     # check against acceptance criteria
-    max: 3
-  - prompt: review     # audit changes for correctness
-    max: 1
+    cycle: true
+  - prompt: check
+    max: 2
 max_cycles: 3</code></pre>
             </div>
           </section>
@@ -212,6 +208,14 @@ max_cycles: 3</code></pre>
                   The agent creates this file when it needs a human decision before continuing.
                   brr stops the loop and prints the file contents (up to 4 KiB) so you can see
                   what the agent is asking about. Resolve the issue, delete the file, and re-run.
+                </p>
+              </div>
+              <div class="signal-item">
+                <p class="signal-name">.brr-cycle</p>
+                <p>
+                  In a workflow, the agent creates this file when another pass should restart
+                  from the stage marked <code>cycle: true</code>. brr removes the file after it
+                  handles the signal.
                 </p>
               </div>
               <div class="signal-item">

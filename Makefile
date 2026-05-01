@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt fmt-fix vet check clean cross-build release-check release-snapshot
+.PHONY: build test lint fmt fmt-fix vet vuln check clean cross-build release-check release-snapshot
 
 # Build the brr binary
 build:
@@ -24,6 +24,10 @@ fmt-fix:
 vet:
 	mise exec -- go vet ./...
 
+# Check reachable dependency vulnerabilities
+vuln:
+	mise exec -- go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
+
 # Cross-compile for all release targets (mirrors .goreleaser.yaml: CGO_ENABLED=0)
 cross-build:
 	@for os in linux darwin windows; do \
@@ -35,7 +39,7 @@ cross-build:
 	@echo "  all targets OK"
 
 # Run all quality gates (use this before committing)
-check: fmt vet lint test build cross-build
+check: fmt vet lint test vuln build cross-build
 
 # Clean build artifacts
 clean:

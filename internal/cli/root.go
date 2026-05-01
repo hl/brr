@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,9 @@ Signal Files:
 
   .brr-needs-approval        The agent creates this when it needs a human decision.
                              brr stops and prints the file contents (up to 4 KiB).
+
+  .brr-cycle                 The agent creates this inside a workflow stage when
+                             another pass is needed from the cycle stage.
 
   .brr.lock                  Prevents concurrent brr instances in the same directory.
                              Acquired on start, released on exit. Stays on disk.
@@ -111,6 +115,10 @@ func run(cmd *cobra.Command, args []string) error {
 		Command: command,
 	})
 
+	if result != nil && result.Reason == engine.ReasonCycle {
+		return fmt.Errorf(".brr-cycle is only supported by 'brr workflow'")
+	}
+
 	// Send notification (best-effort — failure is logged but does not affect exit code)
 	if doNotify && result != nil && result.Reason != engine.ReasonInterrupted {
 		if nErr := notify.Send(result); nErr != nil {
@@ -130,14 +138,11 @@ func resolvePrompt(nameOrPath string) (string, error) {
 	if fi, statErr := os.Lstat(nameOrPath); statErr == nil {
 		if fi.IsDir() {
 			// Don't treat directories as prompt files — fall through to named prompt lookup
-		} else if fi.Size() > maxPromptFileSize {
-			return "", fmt.Errorf("prompt file %s is too large (%d bytes, max %d)", nameOrPath, fi.Size(), maxPromptFileSize)
-		} else if data, err := fsutil.ReadRegularFile(nameOrPath); err == nil {
-			return string(data), nil
-		} else if !errors.Is(err, fsutil.ErrNotRegularFile) {
-			return "", fmt.Errorf("reading prompt file: %w", err)
+		} else if text, err := readPromptFile(nameOrPath); err == nil {
+			return text, nil
+		} else {
+			return "", fmt.Errorf("reading prompt file %s: %w", nameOrPath, err)
 		}
-		// ErrNotRegularFile (symlink/FIFO) — fall through to named prompt / inline
 	} else if looksLikeFilePath(nameOrPath) {
 		// It looks like a file path — distinguish "not found" from other stat errors
 		if os.IsNotExist(statErr) {
@@ -157,8 +162,8 @@ func resolvePrompt(nameOrPath string) (string, error) {
 
 		// Try .brr/prompts/<name>.md
 		projectPath := filepath.Join(".brr", "prompts", name+".md")
-		if data, err := fsutil.ReadRegularFile(projectPath); err == nil {
-			return string(data), nil
+		if text, err := readPromptFile(projectPath); err == nil {
+			return text, nil
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return "", fmt.Errorf("reading %s: %w", projectPath, err)
 		}
@@ -166,8 +171,8 @@ func resolvePrompt(nameOrPath string) (string, error) {
 		// Try user config dir prompts/<name>.md
 		if configDir, err := os.UserConfigDir(); err == nil {
 			userPath := filepath.Join(configDir, "brr", "prompts", name+".md")
-			if data, err := fsutil.ReadRegularFile(userPath); err == nil {
-				return string(data), nil
+			if text, err := readPromptFile(userPath); err == nil {
+				return text, nil
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return "", fmt.Errorf("reading %s: %w", userPath, err)
 			}
@@ -176,6 +181,23 @@ func resolvePrompt(nameOrPath string) (string, error) {
 
 	// Treat as inline prompt text
 	return nameOrPath, nil
+}
+
+func readPromptFile(path string) (string, error) {
+	f, err := fsutil.OpenRegularFile(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+
+	data, err := io.ReadAll(io.LimitReader(f, maxPromptFileSize+1))
+	if err != nil {
+		return "", err
+	}
+	if len(data) > maxPromptFileSize {
+		return "", fmt.Errorf("prompt file is too large (max %d bytes)", maxPromptFileSize)
+	}
+	return string(data), nil
 }
 
 // looksLikeFilePath returns true if s looks like a file path rather than inline prompt text.

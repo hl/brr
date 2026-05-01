@@ -507,6 +507,22 @@ func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 	}
 }
 
+func TestCheckSignalFilesCycle(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(SignalCycle, []byte("again"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sig := checkSignalFiles()
+	if sig == nil {
+		t.Fatal("expected non-nil when .brr-cycle exists")
+	}
+	if sig.reason != ReasonCycle {
+		t.Errorf("expected ReasonCycle, got %d", sig.reason)
+	}
+}
+
 func TestCheckSignalFilesDirectoryIgnored(t *testing.T) {
 	t.Chdir(t.TempDir())
 
