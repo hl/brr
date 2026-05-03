@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.6] "Early Warnings" - 2026-05-03
+
 ### Fixed
 
 - Workflow `--notify` now reports startup and pre-engine errors, and `--reset` can clear an unsafe symlinked workflow state path without following it.
