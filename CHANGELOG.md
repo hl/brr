@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Landing page documentation now reflects the current CLI usage, workflow notification behavior, resume state, and safety guidance.
+
 ## [0.3.6] "Early Warnings" - 2026-05-03
 
 ### Fixed

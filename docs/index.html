@@ -20,6 +20,7 @@
           <a href="#profiles">Profiles</a>
           <a href="#workflows">Workflows</a>
           <a href="#signals">Signals</a>
+          <a href="#safety">Safety</a>
           <a href="https://github.com/hl/brr">GitHub</a>
         </nav>
       </header>
@@ -75,6 +76,8 @@ make build</code></pre>
               <div class="help-panel">
                 <p class="heading">Usage</p>
                 <pre><code>brr &lt;prompt&gt; [flags]
+brr init [--force]
+brr workflow &lt;name&gt; [flags]
 brr [command]</code></pre>
               </div>
               <div class="help-panel">
@@ -88,8 +91,8 @@ workflow    Run a multi-stage workflow</code></pre>
                 <p class="heading">Flags</p>
                 <pre><code>-h, --help             help for brr
 -m, --max int          max iterations (0 = unlimited)
--n, --notify           send desktop notification on stop
--p, --profile string   profile from .brr.yaml
+-n, --notify           send desktop notification when the loop stops
+-p, --profile string   agent profile from .brr.yaml
 -v, --version          version for brr</code></pre>
               </div>
             </div>
@@ -109,6 +112,14 @@ workflow    Run a multi-stage workflow</code></pre>
               <div class="inline-card">
                 <p class="label">inline prompt</p>
                 <pre><code>brr "Fix all TODO comments in src/" --max 5</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">use a profile</p>
+                <pre><code>brr task --max 10 -p codex</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">scaffold a project</p>
+                <pre><code>brr init</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">notify when done</p>
@@ -170,6 +181,10 @@ profiles:
                   Interrupted workflows resume from where they left off. Use <code>--reset</code>
                   to start fresh.
                 </p>
+                <p>
+                  Add <code>--notify</code> when you want a desktop notification for completion,
+                  <code>.brr-failed</code> stops, and workflow errors.
+                </p>
               </div>
               <pre class="config-block"><code>stages:
   - prompt: prepare
@@ -229,9 +244,10 @@ max_cycles: 3</code></pre>
               <div class="signal-item">
                 <p class="signal-name">.brr-workflow-state.json</p>
                 <p>
-                  Tracks workflow progress for resume. Written by <code>brr workflow</code> after
-                  each stage. Deleted on completion. Use <code>--reset</code> to discard and start
-                  fresh. Added to .gitignore by <code>brr init</code>.
+                  Tracks workflow progress for resume, including the next stage, cycle count,
+                  and starting git SHA. Written by <code>brr workflow</code> after each stage.
+                  Deleted on completion. Use <code>--reset</code> to discard and start fresh.
+                  Added to .gitignore by <code>brr init</code>.
                 </p>
               </div>
               <div class="signal-item">
@@ -250,6 +266,27 @@ max_cycles: 3</code></pre>
 3. Do the work
 4. Update the state (mark it done, commit, etc.)
 5. If nothing left, create .brr-complete and exit</code></pre>
+          </section>
+
+          <section class="terminal-block" id="safety">
+            <p class="section-kicker">$ safety notes</p>
+            <div class="inline-grid inline-grid-3">
+              <div class="inline-card">
+                <p class="label">isolate runs</p>
+                <pre><code>docker, VM, devcontainer,
+or a disposable worktree</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">bound loops</p>
+                <pre><code>brr task --max 20</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">interrupts</p>
+                <pre><code>Ctrl+C: finish current run
+Ctrl+C again: interrupt child
+Ctrl+C third: force kill</code></pre>
+              </div>
+            </div>
           </section>
         </div>
       </main>
