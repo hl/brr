@@ -17,6 +17,13 @@ func Send(result *engine.Result) error {
 	return send(title, body)
 }
 
+// SendWorkflowError dispatches a notification for workflow errors that happen
+// before the engine can return a structured stop reason.
+func SendWorkflowError(err error) error {
+	title, body := formatWorkflowError(err)
+	return send(title, body)
+}
+
 func format(result *engine.Result) (title, body string) {
 	switch result.Reason {
 	case engine.ReasonComplete:
@@ -46,6 +53,13 @@ func format(result *engine.Result) (title, body string) {
 	default:
 		return "brr — stopped", "The loop has stopped."
 	}
+}
+
+func formatWorkflowError(err error) (title, body string) {
+	if err == nil {
+		return "brr — workflow error", "The workflow stopped with an error."
+	}
+	return "brr — workflow error", truncate(err.Error(), 256)
 }
 
 // truncate shortens s to at most maxLen bytes, breaking at the last space

@@ -50,34 +50,42 @@ func init() {
 func runWorkflow(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
-	data, err := workflow.Resolve(name)
-	if err != nil {
-		return err
-	}
-
-	wf, err := workflow.Load(data)
-	if err != nil {
-		return err
-	}
-
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-
-	profileFlag, err := cmd.Flags().GetString("profile")
-	if err != nil {
-		return fmt.Errorf("reading --profile flag: %w", err)
-	}
-
 	doNotify, err := cmd.Flags().GetBool("notify")
 	if err != nil {
 		return fmt.Errorf("reading --notify flag: %w", err)
 	}
+	returnWorkflowError := func(err error) error {
+		if doNotify {
+			if nErr := notify.SendWorkflowError(err); nErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
+			}
+		}
+		return err
+	}
+
+	data, err := workflow.Resolve(name)
+	if err != nil {
+		return returnWorkflowError(err)
+	}
+
+	wf, err := workflow.Load(data)
+	if err != nil {
+		return returnWorkflowError(err)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return returnWorkflowError(fmt.Errorf("loading config: %w", err))
+	}
+
+	profileFlag, err := cmd.Flags().GetString("profile")
+	if err != nil {
+		return returnWorkflowError(fmt.Errorf("reading --profile flag: %w", err))
+	}
 
 	reset, err := cmd.Flags().GetBool("reset")
 	if err != nil {
-		return fmt.Errorf("reading --reset flag: %w", err)
+		return returnWorkflowError(fmt.Errorf("reading --reset flag: %w", err))
 	}
 
 	printBanner()
@@ -85,7 +93,7 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 	// Acquire lock for the entire workflow
 	lf, err := engine.AcquireLock()
 	if err != nil {
-		return err
+		return returnWorkflowError(err)
 	}
 	defer engine.ReleaseLock(lf)
 
@@ -113,9 +121,16 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 		if result != nil && result.Reason == engine.ReasonInterrupted {
 			cmd.SilenceErrors = true
 		}
-		if doNotify && result != nil && result.Reason != engine.ReasonInterrupted {
-			if nErr := notify.Send(result); nErr != nil {
-				fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
+		if doNotify {
+			switch {
+			case result != nil && result.Reason != engine.ReasonInterrupted:
+				if nErr := notify.Send(result); nErr != nil {
+					fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
+				}
+			case result == nil:
+				if nErr := notify.SendWorkflowError(runErr); nErr != nil {
+					fmt.Fprintf(os.Stderr, "warning: notification failed: %v\n", nErr)
+				}
 			}
 		}
 	} else if doNotify && result != nil && result.Reason == engine.ReasonFailed {

@@ -995,6 +995,31 @@ func TestDeleteStateIgnoresDirectory(t *testing.T) {
 	}
 }
 
+func TestDeleteStateRemovesSymlink(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	target := filepath.Join(t.TempDir(), "target-state")
+	if err := os.WriteFile(target, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, StateFile); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	deleteState()
+
+	if _, err := os.Lstat(StateFile); !os.IsNotExist(err) {
+		t.Fatalf("expected state symlink to be removed, got: %v", err)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "keep" {
+		t.Fatalf("state deletion modified symlink target: %q", data)
+	}
+}
+
 func TestResumeWithCycleState(t *testing.T) {
 	t.Chdir(t.TempDir())
 

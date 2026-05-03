@@ -267,7 +267,11 @@ func trySaveState(s *State) {
 }
 
 func deleteState() {
-	if fsutil.IsRegularFile(StateFile) {
+	fi, err := os.Lstat(StateFile)
+	if err != nil {
+		return
+	}
+	if fi.Mode().IsRegular() || fi.Mode()&os.ModeSymlink != 0 {
 		_ = os.Remove(StateFile)
 	}
 }

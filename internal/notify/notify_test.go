@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -94,6 +95,26 @@ func TestFormatFailStreak(t *testing.T) {
 		t.Errorf("unexpected title: %q", title)
 	}
 	if body != "Too many consecutive failures." {
+		t.Errorf("unexpected body: %q", body)
+	}
+}
+
+func TestFormatWorkflowError(t *testing.T) {
+	title, body := formatWorkflowError(errors.New("stage 1 (prepare): prompt file not found: prepare.md"))
+	if title != "brr — workflow error" {
+		t.Errorf("unexpected title: %q", title)
+	}
+	if body != "stage 1 (prepare): prompt file not found: prepare.md" {
+		t.Errorf("unexpected body: %q", body)
+	}
+}
+
+func TestFormatWorkflowErrorWithoutError(t *testing.T) {
+	title, body := formatWorkflowError(nil)
+	if title != "brr — workflow error" {
+		t.Errorf("unexpected title: %q", title)
+	}
+	if body != "The workflow stopped with an error." {
 		t.Errorf("unexpected body: %q", body)
 	}
 }
