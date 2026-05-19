@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Workflow V2 schema with explicit stage IDs, agent and command stage types, top-level cycle configuration, strict validation, per-workflow state, JSONL event logs, and workflow `run`, `validate`, `status`, and `init` subcommands.
+
+### Changed
+
+- Workflow state now lives under `.brr/state/workflows/`, and `brr init` creates and gitignores `.brr/state/`.
+- The bundled `ship` workflow now uses Workflow V2 and includes a deterministic `make check` command gate.
+
+### Removed
+
+- Legacy unversioned workflow files and per-stage `cycle: true` are no longer supported.
+
 ### Fixed
 
 - Landing page documentation now reflects the current CLI usage, workflow notification behavior, resume state, and safety guidance.

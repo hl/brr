@@ -8,7 +8,7 @@ dist/
 .brr-needs-approval
 .brr-cycle
 .brr.lock
-.brr-workflow-state.json
+.brr/state/
 
 # OS
 .DS_Store

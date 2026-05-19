@@ -12,7 +12,7 @@ import (
 // Init scaffolds a project for brr.
 func Init(force bool) error {
 	// Pre-flight: reject symlinks to prevent writes outside the repo
-	for _, path := range []string{".brr.yaml", ".gitignore", ".brr", filepath.Join(".brr", "prompts"), filepath.Join(".brr", "workflows")} {
+	for _, path := range []string{".brr.yaml", ".gitignore", ".brr", filepath.Join(".brr", "prompts"), filepath.Join(".brr", "workflows"), filepath.Join(".brr", "state")} {
 		if err := rejectSymlink(path); err != nil {
 			return err
 		}
@@ -30,6 +30,7 @@ func Init(force bool) error {
 	rb := rollbackState{
 		promptDir:   filepath.Join(".brr", "prompts"),
 		workflowDir: filepath.Join(".brr", "workflows"),
+		stateDir:    filepath.Join(".brr", "state"),
 	}
 	if yamlExists {
 		data, err := fsutil.ReadRegularFile(".brr.yaml")
@@ -46,6 +47,8 @@ func Init(force bool) error {
 	rb.promptDirIsNew = os.IsNotExist(promptDirStatErr)
 	_, workflowDirStatErr := os.Lstat(rb.workflowDir)
 	rb.workflowDirIsNew = os.IsNotExist(workflowDirStatErr)
+	_, stateDirStatErr := os.Lstat(rb.stateDir)
+	rb.stateDirIsNew = os.IsNotExist(stateDirStatErr)
 
 	// Stage 1: write .brr.yaml (re-verify no symlink swap before writing)
 	if err := rejectSymlink(".brr.yaml"); err != nil {
@@ -55,7 +58,7 @@ func Init(force bool) error {
 		return err
 	}
 
-	// Stage 2: create .brr/prompts/ and .brr/workflows/
+	// Stage 2: create .brr/prompts/, .brr/workflows/, and .brr/state/
 	if err := rejectSymlink(rb.promptDir); err != nil {
 		if rErr := restoreFile(".brr.yaml", rb.yamlData, rb.yamlMode, rb.yamlExisted); rErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: rollback of .brr.yaml failed: %v\n", rErr)
@@ -76,6 +79,14 @@ func Init(force bool) error {
 		rb.rollback()
 		return err
 	}
+	if err := rejectSymlink(rb.stateDir); err != nil {
+		rb.rollback()
+		return err
+	}
+	if err := os.MkdirAll(rb.stateDir, 0o755); err != nil {
+		rb.rollback()
+		return err
+	}
 
 	// Stage 3: update .gitignore (re-verify no symlink swap)
 	if err := rejectSymlink(".gitignore"); err != nil {
@@ -88,7 +99,7 @@ func Init(force bool) error {
 		return fmt.Errorf("updating .gitignore: %w", err)
 	}
 
-	created := []string{".brr.yaml", ".brr/prompts/", ".brr/workflows/"}
+	created := []string{".brr.yaml", ".brr/prompts/", ".brr/workflows/", ".brr/state/"}
 	if gitignoreUpdated {
 		created = append(created, ".gitignore (updated)")
 	}
@@ -100,8 +111,8 @@ func Init(force bool) error {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "  Next steps:")
 	fmt.Fprintln(os.Stderr, "    1. Add prompts to .brr/prompts/")
-	fmt.Fprintln(os.Stderr, "    2. Add workflows to .brr/workflows/ if you want multi-stage runs")
-	fmt.Fprintln(os.Stderr, "    3. Run them: brr <prompt-name>  or  brr workflow <workflow-name>")
+	fmt.Fprintln(os.Stderr, "    2. Add workflows to .brr/workflows/ or run: brr workflow init ship")
+	fmt.Fprintln(os.Stderr, "    3. Run them: brr <prompt-name>  or  brr workflow run <workflow-name>")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "  Docs: https://github.com/hl/brr")
 
@@ -116,6 +127,8 @@ type rollbackState struct {
 	promptDirIsNew   bool
 	workflowDir      string
 	workflowDirIsNew bool
+	stateDir         string
+	stateDirIsNew    bool
 }
 
 func (rb *rollbackState) rollback() {
@@ -124,6 +137,9 @@ func (rb *rollbackState) rollback() {
 	}
 	if rb.workflowDirIsNew {
 		_ = os.Remove(rb.workflowDir)
+	}
+	if rb.stateDirIsNew {
+		_ = os.Remove(rb.stateDir)
 	}
 	if rb.promptDirIsNew {
 		_ = os.Remove(rb.promptDir)
@@ -171,7 +187,7 @@ var gitignoreEntries = []string{
 	".brr-needs-approval",
 	".brr-cycle",
 	".brr.lock",
-	".brr-workflow-state.json",
+	".brr/state/",
 }
 
 // updateGitignore appends missing brr entries to .gitignore.

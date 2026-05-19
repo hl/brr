@@ -35,6 +35,12 @@ brr task --max 10 -p opus
 
 # Scaffold a project
 brr init
+
+# Create and run the bundled ship workflow
+brr workflow init ship
+brr workflow validate ship
+brr workflow run ship
+brr workflow status ship
 ```
 
 ## Configuration
@@ -95,6 +101,37 @@ You are one iteration of a loop. Do one unit of work, then exit.
 
 Put prompts in `.brr/prompts/` (per-project) or `<os-config-dir>/brr/prompts/` (global). Then `brr task` resolves to `.brr/prompts/task.md`. Or point at any file: `brr ./my-prompt.md`.
 
+## Workflows
+
+Workflows are versioned YAML pipelines in `.brr/workflows/`. They combine agent stages with deterministic command gates:
+
+```yaml
+version: 2
+description: "requirements -> verified, reviewed code"
+
+defaults:
+  profile: claude
+  max: 3
+
+cycle:
+  target: build
+  max: 3
+
+stages:
+  - id: build
+    type: agent
+    prompt: build
+    max: 100
+
+  - id: check
+    type: command
+    command: ["make", "check"]
+```
+
+Run workflows with `brr workflow run <name>`. Use `brr workflow validate <name>` before a long run, `brr workflow status [name]` to inspect saved progress, and `brr workflow init <name> --template ship` to copy the bundled requirements-to-review workflow.
+
+Workflow progress is stored in `.brr/state/workflows/<name>.json`; event history is appended to `.brr/state/workflows/<name>.events.jsonl`. Successful runs delete the state file and keep the event log for debugging.
+
 ## How it works
 
 brr pipes the same prompt to the configured command, once per iteration. Each run gets a fresh process with a clean context window.
@@ -104,8 +141,9 @@ The loop is controlled by signal files in the working directory:
 - **`.brr-complete`** — the agent creates this when all work is finished. brr detects it, stops the loop, and removes the file.
 - **`.brr-failed`** — the agent creates this when it hits a blocker or cannot recover after retrying. brr stops the loop and prints the file contents (up to 4 KiB). Investigate the failure, delete the file, and re-run.
 - **`.brr-needs-approval`** — the agent creates this when it needs a human decision. brr stops the loop and prints the file contents (up to 4 KiB). Resolve the issue, delete the file, and re-run.
-- **`.brr-cycle`** — inside `brr workflow`, the agent creates this when a later stage found more work and the workflow should restart from the stage marked `cycle: true`.
+- **`.brr-cycle`** — inside `brr workflow run`, the agent creates this when a later stage found more work and the workflow should restart from `cycle.target`.
 - **`.brr.lock`** — prevents multiple brr instances from running in the same directory. Acquired on start, released on exit. The file stays on disk between runs (this is intentional). Added to `.gitignore` by `brr init`.
+- **`.brr/state/workflows/`** — workflow resume state and event logs. State files are deleted on successful completion; event logs remain for debugging.
 
 Three consecutive failures also stop the loop automatically.
 

@@ -36,13 +36,14 @@ Signal Files:
                              brr stops and prints the file contents (up to 4 KiB).
 
   .brr-cycle                 The agent creates this inside a workflow stage when
-                             another pass is needed from the cycle stage.
+                             another pass is needed from cycle.target.
 
   .brr.lock                  Prevents concurrent brr instances in the same directory.
                              Acquired on start, released on exit. Stays on disk.
 
-  .brr-workflow-state.json   Tracks workflow progress for resume. Written by
-                             'brr workflow' after each stage. Deleted on completion.
+  .brr/state/workflows/      Tracks workflow progress and event history for
+                             resume, status, and debugging. Written by
+                             'brr workflow run'. State is deleted on completion.
                              Use --reset to discard and start fresh.`,
 	Args:         cobra.ExactArgs(1),
 	RunE:         run,

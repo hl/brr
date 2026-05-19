@@ -2,86 +2,77 @@
 
 ## Purpose
 
-The workflow command orchestrates multi-stage brr pipelines. Each stage runs the loop engine with a configured prompt and iteration limit. Stages execute sequentially. Any stage can request another pass by creating `.brr-cycle`, and the workflow then cycles back to the stage marked `cycle: true`.
+The workflow command orchestrates versioned YAML pipelines. A workflow is a sequence of named stages. Agent stages run the loop engine with a prompt, while command stages run deterministic checks or gates. Workflow state and event history are persisted under `.brr/state/workflows/` so runs can be resumed, inspected, and debugged.
 
 ## Requirements
 
-1. The command is `brr workflow <name> [flags]`. The name argument is required.
-2. Workflow files are YAML. Resolution follows the same pattern as prompts: `.brr/workflows/<name>.yaml` first, then `<user-config-dir>/brr/workflows/<name>.yaml`. The first match wins. If no file is found, the command returns an error listing both searched paths.
-3. The YAML schema has two top-level keys: `stages` (required, list) and `max_cycles` (optional, integer, default 3). Each stage has `prompt` (required, string), `max` (required, positive integer), `profile` (optional, string), and `cycle` (optional, boolean, default false).
-4. Validation rules: at least one stage must be defined; each stage must have a non-empty `prompt` and a `max` greater than zero; at most one stage may set `cycle: true`; `max_cycles` must be greater than zero.
-5. Profile resolution per stage follows a three-tier priority: if the stage specifies `profile`, use it; otherwise use the `--profile` CLI flag; otherwise use the config's default profile. Profile resolution uses the same `config.ResolveProfile` function as the main command.
-6. Prompt resolution per stage uses the same `resolvePrompt` function as the main command.
-7. The workflow acquires the exclusive lock (`.brr.lock`) once before the first stage and holds it until the workflow exits. Individual engine runs skip lock acquisition.
-8. Stages execute sequentially. For each stage, the workflow resolves the prompt and profile, prints a stage header, then calls the engine. The engine's `SkipLock` option must be true.
-9. Stage header output includes: the stage number (1-indexed), total stage count, prompt name, profile name, max iterations, and cycle number if cycling.
-10. After each stage, the workflow inspects the engine result:
-    - `ReasonComplete`: continue to the next stage.
-    - `ReasonMaxIterations` with nil error: continue to the next stage.
-    - `ReasonMaxIterations` with error (last iteration failed): stop the workflow with an error.
-    - `ReasonFailed`: stop the workflow, preserve the state file, print the failure content, and exit with code 0 so the workflow can resume after the failure is investigated.
-    - `ReasonApproval`: stop the workflow, print the approval content, exit with code 0.
-    - `ReasonFailStreak`: stop the workflow with an error.
-    - `ReasonInterrupted`: stop the workflow, exit with code 130.
-11. If any stage exits because `.brr-cycle` was created, and a stage with `cycle: true` exists, and the cycle count has not reached `max_cycles`, the workflow increments the cycle counter and restarts from the cycle stage.
-12. If `.brr-cycle` is created with no configured cycle stage, or after `max_cycles` is reached, the workflow exits with an error.
-13. On startup, the workflow prints the banner, then a workflow summary: name, number of stages, max cycles, and the list of stages with their prompts and limits. All workflow output goes to stderr.
-14. The `--profile` flag on the workflow command sets a default profile for all stages. Per-stage `profile` in the YAML overrides this. If neither is set, the config default applies.
-15. The `--notify` flag sends a desktop notification when the workflow completes successfully, stops due to `.brr-failed`, or stops due to error (not per-stage). Approval pauses and interrupts do not trigger notifications.
-16. Exit codes: 0 for success or approval pause, 1 for errors, 130 for interrupt.
-17. The workflow persists progress to `.brr-workflow-state.json` after each stage completes. The state file contains the workflow name, the index of the next stage to run, the current cycle count, and the git HEAD SHA at workflow start.
-18. On startup, if `.brr-workflow-state.json` exists and its `workflow` field matches the current workflow name, the workflow resumes from the saved stage and cycle. If the saved stage index is out of bounds (e.g., the workflow YAML was modified), the workflow starts fresh.
-19. When the workflow completes successfully (all stages done, no more cycles), the state file is deleted.
-20. On error, approval pause, or interrupt, the state file is preserved so the next run resumes from the last checkpoint.
-21. The `--reset` flag deletes the state file before starting, forcing a fresh run from stage 1.
-22. The state file's `start_sha` field records `git rev-parse HEAD` at the time the workflow first starts (not on resume). This allows prompts for prompt-owned follow-up logic to determine the diff base.
+1. Workflow execution is invoked with `brr workflow run <name> [flags]`.
+2. Workflow validation is invoked with `brr workflow validate <name> [flags]`.
+3. Workflow status is invoked with `brr workflow status [name]`.
+4. Workflow template creation is invoked with `brr workflow init <name> --template ship`.
+5. Workflow files are YAML. Resolution searches `.brr/workflows/<name>.yaml`, then `<user-config-dir>/brr/workflows/<name>.yaml`. The first match wins.
+6. Workflow names must be non-empty and must not include path separators or `..`.
+7. Workflow files must use schema `version: 2`. Unversioned or older workflow files are rejected with a clear migration-style error.
+8. The V2 schema has top-level keys: `version` (required, integer `2`), `description` (optional string), `defaults` (optional map), `cycle` (optional map), and `stages` (required list).
+9. `defaults.profile` sets the default profile for agent stages. `defaults.max` sets the default max iteration count for agent stages and must be non-negative.
+10. `cycle.target` names the stage to restart from when any stage produces `.brr-cycle`. `cycle.max` is required when `cycle` is set and must be positive.
+11. Each stage must have a unique `id` and a `type` of `agent` or `command`.
+12. Agent stages require `prompt`, may set `profile`, and may set positive `max`. Effective profile resolution is stage profile, then `--profile`, then workflow default profile, then config default. Effective max is stage max, then `defaults.max`.
+13. Command stages require `command`, a non-empty argv array. Command stages do not accept `prompt`, `profile`, or `max`.
+14. `brr workflow validate` resolves the workflow YAML, validates schema, validates profile references, resolves prompts, and checks command executables without running any stage.
+15. `brr workflow run` acquires the exclusive lock once before the first stage and holds it until the workflow exits. Agent stage engine runs use `SkipLock: true`.
+16. Stages execute sequentially. Each stage must complete before the next stage starts.
+17. Command stages run the argv array directly without shell expansion and inherit stdin, stdout, and stderr.
+18. After every stage, the workflow records state in `.brr/state/workflows/<name>.json` and appends an event to `.brr/state/workflows/<name>.events.jsonl`.
+19. The state file contains `schema_version`, `workflow`, `run_id`, `started_at`, `updated_at`, `start_sha`, `next_stage_id`, `cycle_count`, and per-stage status entries with status, reason, duration, prompt/profile/command metadata.
+20. On startup, if the state file is valid for the current workflow, the run resumes from `next_stage_id`. Invalid state is ignored and a fresh run starts.
+21. `--reset` deletes the workflow state file before starting. Event history is preserved.
+22. On successful completion, the workflow state file is deleted. Event history remains.
+23. On error, approval pause, failure signal, or interrupt, the workflow state file is preserved so the next run can resume.
+24. If `.brr-cycle` is detected and `cycle` is configured with remaining cycles, the workflow increments `cycle_count` and restarts from `cycle.target`.
+25. If `.brr-cycle` is detected without a cycle config, or after `cycle.max` is reached, the workflow exits with an error.
+26. Agent-reported `.brr-failed` and `.brr-needs-approval` stop the workflow with exit code 0 and preserve state.
+27. Command stage non-zero exits stop the workflow with exit code 1 and preserve state.
+28. Interrupts stop the workflow with exit code 130 and preserve state.
+29. `--notify` sends a desktop notification when the workflow completes successfully, stops due to `.brr-failed`, or stops due to error. Approval pauses and interrupts do not trigger notifications.
+30. `brr init` creates `.brr/prompts/`, `.brr/workflows/`, `.brr/state/`, and gitignore entries for workflow runtime state.
 
 ## Constraints
 
-- No new external dependencies. YAML parsing uses `go.yaml.in/yaml/v3` already available via viper.
-- The workflow must work on Linux, macOS, and Windows.
-- Workflow resolution must reject path traversal (`..`) in the name argument, consistent with prompt resolution.
+- No legacy workflow execution path is retained.
+- No shell string command stages. Command stages always use argv arrays.
 - Workflow resolution and state persistence must not follow symlinks.
-- The workflow must not inspect or modify prompt-owned state. Prompts decide when to create `.brr-complete`, `.brr-failed`, `.brr-needs-approval`, or `.brr-cycle`.
+- The workflow must not inspect or modify prompt-owned task state such as `IMPLEMENTATION_PLAN.md`.
+- Workflow execution must work on Linux, macOS, and Windows.
 
 ## Dependencies
 
-- Depends on `docs/specs/loop-engine.md` for stage execution (engine.Run).
+- Depends on `docs/specs/loop-engine.md` for agent stage execution.
 - Depends on `docs/specs/concurrent-run-prevention.md` for exclusive locking.
 - Depends on `docs/specs/prompt-resolution.md` for per-stage prompt resolution.
 - Depends on `docs/specs/configuration.md` for profile resolution.
-- Depends on `docs/specs/notifications.md` for the `--notify` flag behavior.
+- Depends on `docs/specs/notifications.md` for notification behavior.
 - Depends on `docs/specs/cli-interface.md` for exit code conventions.
 
 ## Acceptance Criteria
 
-- [ ] `brr workflow <name>` loads and executes `.brr/workflows/<name>.yaml`.
-- [ ] Workflow file resolution searches project then user config directory.
-- [ ] Workflow file resolution rejects symlinks and other non-regular files.
-- [ ] Missing workflow file returns an error listing both searched paths.
-- [ ] Invalid YAML (missing stages, zero max, multiple cycle stages) is rejected with a clear error.
-- [ ] Stages execute sequentially — each stage's engine run completes before the next starts.
-- [ ] Per-stage profile overrides the default; absent profile falls back to config default.
-- [ ] The lock is held for the entire workflow duration, not per-stage.
-- [ ] Engine runs use `SkipLock: true`.
-- [ ] `ReasonApproval` stops the workflow and exits 0.
-- [ ] `ReasonFailed` stops the workflow, preserves state, and exits 0.
-- [ ] `ReasonFailStreak` stops the workflow and exits 1.
-- [ ] `ReasonInterrupted` stops the workflow and exits 130.
-- [ ] `.brr-cycle` cycles back to the configured cycle stage when cycles are available.
-- [ ] `.brr-cycle` returns an error when no cycle stage is configured.
-- [ ] `.brr-cycle` returns an error when `max_cycles` is reached.
-- [ ] Stage headers and workflow summary are printed to stderr.
-- [ ] `--notify` sends a notification on workflow completion and `.brr-failed` stops.
-- [ ] Path traversal (`..`) in the workflow name is rejected.
-- [ ] State file is written after each stage completes.
-- [ ] State file writes reject symlinks and other non-regular files.
-- [ ] Resuming from state file skips already-completed stages.
-- [ ] State file with mismatched workflow name is ignored (starts fresh).
-- [ ] State file with out-of-bounds stage index causes a fresh start.
-- [ ] `--reset` deletes the state file and starts from stage 1.
-- [ ] State file is deleted on successful workflow completion.
-- [ ] State file is preserved on approval pause and interrupt.
-- [ ] `start_sha` is set on first run and preserved across resumes.
+- [ ] V2 workflows with agent and command stages load and validate.
+- [ ] Legacy unversioned workflows are rejected with a migration-style error.
+- [ ] Duplicate stage IDs, unknown stage types, invalid cycle targets, missing prompts, and empty command arrays are rejected.
+- [ ] `brr workflow validate <name>` checks schema, profiles, prompts, and command executables without executing stages.
+- [ ] `brr workflow run <name>` executes stages sequentially.
+- [ ] Command stages run argv directly, inherit stdio, and stop the workflow on non-zero exit.
+- [ ] Agent stages use prompt resolution, profile resolution, effective max, and `SkipLock: true`.
+- [ ] `.brr-cycle` restarts from `cycle.target` until `cycle.max` is reached.
+- [ ] `.brr-cycle` errors when no cycle config exists or cycle max is reached.
+- [ ] State is written to `.brr/state/workflows/<name>.json` and event logs to `.brr/state/workflows/<name>.events.jsonl`.
+- [ ] Successful completion deletes only the state file and preserves event history.
+- [ ] Failure, approval, error, and interrupt preserve state.
+- [ ] Resume starts from the saved `next_stage_id`.
+- [ ] `--reset` discards saved state and starts from the first stage.
+- [ ] `brr workflow status [name]` prints saved state or a clear no-state message.
+- [ ] `brr workflow init <name> --template ship` creates a valid V2 workflow file.
+- [ ] `brr init` creates `.brr/state/` and gitignores `.brr/state/`.
+- [ ] State and event writes reject symlinks and other non-regular files.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.

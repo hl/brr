@@ -1,28 +1,50 @@
 # Full development workflow: requirements -> verified, reviewed code.
 #
 # Usage:
-#   brr workflow ship
+#   brr workflow run ship
 #
 # Prerequisite: create REQUIREMENTS.md with your feature description.
 #
-# Pipeline: spec -> plan -> build -> verify -> review
-# If verify or review creates .brr-cycle, cycles back to build (up to max_cycles).
+# Pipeline: spec -> plan -> build -> check -> verify -> review
+# If check, verify, or review creates .brr-cycle, cycles back to build (up to cycle.max).
+
+version: 2
+description: "requirements -> verified, reviewed code"
+
+defaults:
+  profile: claude
+  max: 3
+
+cycle:
+  target: build
+  max: 3
 
 stages:
-  - prompt: spec
+  - id: spec
+    type: agent
+    prompt: spec
     max: 3
 
-  - prompt: plan
+  - id: plan
+    type: agent
+    prompt: plan
     max: 5
 
-  - prompt: build
+  - id: build
+    type: agent
+    prompt: build
     max: 100
-    cycle: true
 
-  - prompt: verify
+  - id: check
+    type: command
+    command: ["make", "check"]
+
+  - id: verify
+    type: agent
+    prompt: verify
     max: 3
 
-  - prompt: review
+  - id: review
+    type: agent
+    prompt: review
     max: 1
-
-max_cycles: 3
