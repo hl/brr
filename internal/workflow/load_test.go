@@ -172,3 +172,33 @@ func TestValidateRuntimeProfileAndPrompt(t *testing.T) {
 		t.Fatalf("expected profile error, got: %v", err)
 	}
 }
+
+func TestResolveStageProfileUsesWorkflowDefault(t *testing.T) {
+	wf := testWorkflow([]Stage{{ID: "build", Type: StageTypeAgent, Prompt: "build", Max: 1}}, nil)
+	wf.Defaults.Profile = "special"
+	cfg := testConfig(echoCmd())
+	cfg.Profiles["special"] = cfg.Profiles["test"]
+
+	_, resolved, err := resolveStageProfile(wf.Stages[0], wf, "", cfg)
+	if err != nil {
+		t.Fatalf("unexpected profile error: %v", err)
+	}
+	if resolved != "special" {
+		t.Fatalf("expected workflow default profile, got %q", resolved)
+	}
+}
+
+func TestResolveStageProfileFlagOverridesWorkflowDefault(t *testing.T) {
+	wf := testWorkflow([]Stage{{ID: "build", Type: StageTypeAgent, Prompt: "build", Max: 1}}, nil)
+	wf.Defaults.Profile = "special"
+	cfg := testConfig(echoCmd())
+	cfg.Profiles["special"] = cfg.Profiles["test"]
+
+	_, resolved, err := resolveStageProfile(wf.Stages[0], wf, "test", cfg)
+	if err != nil {
+		t.Fatalf("unexpected profile error: %v", err)
+	}
+	if resolved != "test" {
+		t.Fatalf("expected CLI profile override, got %q", resolved)
+	}
+}

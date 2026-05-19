@@ -64,7 +64,7 @@ func ValidateRuntime(wf Workflow, cfg config.Config, profileFlag string, resolve
 	for _, stage := range wf.Stages {
 		switch stage.Type {
 		case StageTypeAgent:
-			if _, _, err := resolveWorkflowProfile(stage.Profile, profileFlag, cfg); err != nil {
+			if _, _, err := resolveStageProfile(stage, wf, profileFlag, cfg); err != nil {
 				return fmt.Errorf("stages.%s.profile: %w", stage.ID, err)
 			}
 			if resolvePrompt != nil {
@@ -170,6 +170,17 @@ func resolveWorkflowProfile(stageProfile, flagProfile string, cfg config.Config)
 	name := stageProfile
 	if name == "" {
 		name = flagProfile
+	}
+	return cfg.ResolveProfile(name)
+}
+
+func resolveStageProfile(stage Stage, wf Workflow, flagProfile string, cfg config.Config) ([]string, string, error) {
+	name := stage.Profile
+	if name == "" {
+		name = flagProfile
+	}
+	if name == "" {
+		name = wf.Defaults.Profile
 	}
 	return cfg.ResolveProfile(name)
 }

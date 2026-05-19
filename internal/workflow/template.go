@@ -3,7 +3,6 @@ package workflow
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 func InitTemplate(name, template string) error {
@@ -13,11 +12,11 @@ func InitTemplate(name, template string) error {
 	if template != "ship" {
 		return fmt.Errorf("unknown workflow template %q (available: ship)", template)
 	}
-	target := filepath.Join(".brr", "workflows", name+".yaml")
+	target := workflowPath(name)
 	if err := rejectUnsafeExisting(target); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := ensureWorkflowDir(); err != nil {
 		return fmt.Errorf("creating .brr/workflows: %w", err)
 	}
 	if _, err := os.Lstat(target); err == nil {

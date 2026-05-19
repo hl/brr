@@ -46,6 +46,31 @@ func TestInitTemplateWritesShipWorkflow(t *testing.T) {
 	}
 }
 
+func TestInitTemplateRejectsSymlinkedWorkflowDir(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.Mkdir(".brr", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	targetDir := filepath.Join(t.TempDir(), "outside-workflows")
+	if err := os.Mkdir(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(targetDir, filepath.Join(".brr", "workflows")); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	err := InitTemplate("ship", "ship")
+	if err == nil {
+		t.Fatal("expected symlinked workflow dir to be rejected")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("expected symlink error, got: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "ship.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("template write followed symlink, stat err: %v", err)
+	}
+}
+
 func TestStateWriteRejectsSymlink(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.MkdirAll(StateDir, 0o755); err != nil {

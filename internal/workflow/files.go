@@ -72,21 +72,41 @@ func appendRegularFile(path string, data []byte, perm os.FileMode) error {
 
 func ensureStateDir() error {
 	for _, path := range []string{".brr", filepath.Join(".brr", "state"), StateDir} {
-		fi, err := os.Lstat(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf("checking %s: %w", path, err)
-		}
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("%s is a symlink", path)
-		}
-		if !fi.IsDir() {
-			return fmt.Errorf("%s is not a directory", path)
+		if err := rejectUnsafeDirectory(path); err != nil {
+			return err
 		}
 	}
 	return os.MkdirAll(StateDir, 0o755)
+}
+
+func ensureWorkflowDir() error {
+	for _, path := range []string{".brr", filepath.Join(".brr", "workflows")} {
+		if err := rejectUnsafeDirectory(path); err != nil {
+			return err
+		}
+	}
+	return os.MkdirAll(filepath.Join(".brr", "workflows"), 0o755)
+}
+
+func workflowPath(name string) string {
+	return filepath.Join(".brr", "workflows", name+".yaml")
+}
+
+func rejectUnsafeDirectory(path string) error {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking %s: %w", path, err)
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symlink", path)
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("%s is not a directory", path)
+	}
+	return nil
 }
 
 func rejectUnsafeExisting(path string) error {

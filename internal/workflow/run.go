@@ -164,7 +164,7 @@ func runAgentStage(opts Options, stage Stage) (*engine.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	command, _, err := resolveWorkflowProfile(stage.Profile, opts.ProfileFlag, opts.Config)
+	command, _, err := resolveStageProfile(stage, opts.Workflow, opts.ProfileFlag, opts.Config)
 	if err != nil {
 		return nil, err
 	}
