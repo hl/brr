@@ -1,10 +1,13 @@
 package workflow
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hl/brr/internal/engine"
 )
@@ -170,5 +173,82 @@ func TestResumeUsesPerWorkflowState(t *testing.T) {
 	}
 	if strings.Contains(string(data), "first") || !strings.Contains(string(data), "second") {
 		t.Fatalf("expected only second stage to run, got %q", data)
+	}
+}
+
+func TestResumeIgnoresMismatchedWorkflowState(t *testing.T) {
+	t.Chdir(t.TempDir())
+	logFile := filepath.Join(".", "stage-log")
+	cmd := catToFileCmd(logFile)
+	wf := testWorkflow([]Stage{
+		{ID: "first", Type: StageTypeAgent, Prompt: "first", Max: 1},
+		{ID: "second", Type: StageTypeAgent, Prompt: "second", Max: 1},
+	}, nil)
+	state := &State{
+		SchemaVersion: SchemaVersion,
+		Workflow:      "other",
+		RunID:         "abc",
+		StartedAt:     testTime(),
+		UpdatedAt:     testTime(),
+		NextStageID:   "second",
+		Stages:        initialStageStatus(wf),
+	}
+	(store{name: "ship"}).save(state)
+
+	_, err := Run(Options{
+		Name:     "ship",
+		Workflow: wf,
+		Config:   testConfig(cmd),
+		ResolvePrompt: func(name string) (string, error) {
+			return name + "\n", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "first") || !strings.Contains(string(data), "second") {
+		t.Fatalf("expected mismatched state to be ignored, got %q", data)
+	}
+}
+
+func TestRunCommandStageInterruptPreservesState(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Interrupt signaling is not reliable for this process-level test on Windows")
+	}
+	t.Chdir(t.TempDir())
+	wf := testWorkflow([]Stage{{ID: "check", Type: StageTypeCommand, Command: sleepCmd()}}, nil)
+
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		proc, err := os.FindProcess(os.Getpid())
+		if err == nil {
+			_ = proc.Signal(os.Interrupt)
+		}
+	}()
+
+	result, err := Run(Options{
+		Name:     "ship",
+		Workflow: wf,
+		Config:   testConfig(echoCmd()),
+		ResolvePrompt: func(name string) (string, error) {
+			return name, nil
+		},
+	})
+	if !errors.Is(err, engine.ErrInterrupted) {
+		t.Fatalf("expected interrupted error, got result=%#v err=%v", result, err)
+	}
+	if result == nil || result.Reason != engine.ReasonInterrupted {
+		t.Fatalf("expected interrupted result, got %#v", result)
+	}
+	state := readState(t, "ship")
+	if state.NextStageID != "check" {
+		t.Fatalf("expected resume at interrupted stage, got %q", state.NextStageID)
+	}
+	if state.Stages[0].Status != "interrupted" {
+		t.Fatalf("expected stage status interrupted, got %q", state.Stages[0].Status)
 	}
 }

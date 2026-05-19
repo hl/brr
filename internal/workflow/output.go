@@ -34,6 +34,9 @@ func stopReason(result *engine.Result) string {
 }
 
 func stageStatusFromResult(result *engine.Result, err error) string {
+	if result != nil && result.Reason == engine.ReasonInterrupted {
+		return "interrupted"
+	}
 	if err != nil {
 		return "error"
 	}

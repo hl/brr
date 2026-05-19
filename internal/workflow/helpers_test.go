@@ -55,6 +55,13 @@ func failCmd() []string {
 	return []string{"false"}
 }
 
+func sleepCmd() []string {
+	if runtime.GOOS == "windows" {
+		return []string{"cmd", "/c", "ping -n 10 127.0.0.1 > nul"}
+	}
+	return []string{"sh", "-c", "sleep 10"}
+}
+
 func catToFileCmd(path string) []string {
 	if runtime.GOOS == "windows" {
 		return []string{"cmd", "/c", "set /p x= & echo %x% >> " + path}

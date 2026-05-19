@@ -103,9 +103,9 @@ func stageStatus(stage Stage, status, reason string, duration time.Duration) Sta
 	}
 }
 
-func validResumeState(s *State, wf Workflow) bool {
+func validResumeState(s *State, wf Workflow, name string) bool {
 	return s.SchemaVersion == SchemaVersion &&
-		s.Workflow != "" &&
+		s.Workflow == name &&
 		s.RunID != "" &&
 		s.CycleCount >= 0 &&
 		(wf.Cycle != nil || s.CycleCount == 0) &&

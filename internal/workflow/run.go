@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"sync/atomic"
 	"time"
 
 	"github.com/hl/brr/internal/engine"
@@ -79,7 +81,7 @@ func initialRunState(opts Options, store store) (int, *State) {
 	if opts.Reset {
 		return 0, state
 	}
-	if saved, err := store.load(); err == nil && validResumeState(saved, opts.Workflow) {
+	if saved, err := store.load(); err == nil && validResumeState(saved, opts.Workflow, opts.Name) {
 		fmt.Fprintf(os.Stderr, "  %sresuming:%s stage %s", ui.Dim, ui.Reset, saved.NextStageID)
 		if saved.CycleCount > 0 {
 			fmt.Fprintf(os.Stderr, " (cycle %d)", saved.CycleCount)
@@ -181,10 +183,43 @@ func runCommandStage(stage Stage) (*engine.Result, error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	err := cmd.Run()
+
+	if err := cmd.Start(); err != nil {
+		if sig := detectSignalFiles(); sig != nil {
+			cleanupSignalFiles()
+			return sig, nil
+		}
+		return &engine.Result{Reason: engine.ReasonFailStreak}, err
+	}
+
+	var interrupted atomic.Bool
+	sigCh := make(chan os.Signal, 2)
+	done := make(chan struct{})
+	signal.Notify(sigCh, commandStageSignals()...)
+	defer signal.Stop(sigCh)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case sig := <-sigCh:
+				interrupted.Store(true)
+				if cmd.Process != nil {
+					_ = cmd.Process.Signal(sig)
+				}
+			}
+		}
+	}()
+
+	err := cmd.Wait()
+	close(done)
+
 	if sig := detectSignalFiles(); sig != nil {
 		cleanupSignalFiles()
 		return sig, nil
+	}
+	if interrupted.Load() {
+		return &engine.Result{Reason: engine.ReasonInterrupted}, engine.ErrInterrupted
 	}
 	if err != nil {
 		return &engine.Result{Reason: engine.ReasonFailStreak}, err
