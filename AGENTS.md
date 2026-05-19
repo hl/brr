@@ -35,6 +35,7 @@ make fmt            # check formatting (fix with: make fmt-fix)
 - No `// TODO`, `// FIXME`, stubs, or `panic("not implemented")` in committed code
 - Commit format: `type(scope): description`
 - CHANGELOG: update for all user-visible changes; group by Added/Changed/Fixed/Removed
+- Keep files small enough for agent workflows. Prefer files under 400 lines; split by responsibility before a file reaches 500 lines. Tests may exceed this only when a cohesive fixture/table would become harder to follow if split.
 
 ## Conventions
 
