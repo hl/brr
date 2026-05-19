@@ -77,15 +77,20 @@ make build</code></pre>
                 <p class="heading">Usage</p>
                 <pre><code>brr &lt;prompt&gt; [flags]
 brr init [--force]
-brr workflow &lt;name&gt; [flags]
+brr instructions
+brr workflow run &lt;name&gt; [flags]
+brr workflow validate &lt;name&gt;
+brr workflow status [name]
+brr workflow init &lt;name&gt;
 brr [command]</code></pre>
               </div>
               <div class="help-panel">
                 <p class="heading">Available Commands</p>
-                <pre><code>completion  Generate the autocompletion script
-help        Help about any command
-init        Scaffold a project for brr
-workflow    Run a multi-stage workflow</code></pre>
+                <pre><code>completion    Generate the autocompletion script
+help          Help about any command
+init          Scaffold a project for brr
+instructions  Print agent setup instructions
+workflow      Manage YAML workflows</code></pre>
               </div>
               <div class="help-panel">
                 <p class="heading">Flags</p>
@@ -126,12 +131,20 @@ workflow    Run a multi-stage workflow</code></pre>
                 <pre><code>brr task --max 20 --notify</code></pre>
               </div>
               <div class="inline-card">
-                <p class="label">run a workflow</p>
-                <pre><code>brr workflow release</code></pre>
+                <p class="label">print agent setup guide</p>
+                <pre><code>brr instructions</code></pre>
               </div>
               <div class="inline-card">
-                <p class="label">restart a workflow</p>
-                <pre><code>brr workflow release --reset</code></pre>
+                <p class="label">run a workflow</p>
+                <pre><code>brr workflow run ship</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">inspect workflow state</p>
+                <pre><code>brr workflow status ship</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">copy a workflow template</p>
+                <pre><code>brr workflow init ship</code></pre>
               </div>
             </div>
           </section>
@@ -167,34 +180,44 @@ profiles:
           </section>
 
           <section class="terminal-block" id="workflows">
-            <p class="section-kicker">$ cat .brr/workflows/release.yaml</p>
+            <p class="section-kicker">$ cat .brr/workflows/ship.yaml</p>
             <div class="config-layout">
               <div class="copy-block">
                 <p>
-                  Workflows turn brr into an autonomous agentic pipeline. Define stages, point each
-                  at a prompt, and let the cycle-back loop close the feedback gap. Pair with
-                  pre-commit hooks or CI checks and the agent doesn't just
-                  think it's done, something external proves it.
+                  Workflows turn brr into an autonomous agentic pipeline. Define explicit stage IDs,
+                  mix agent stages with command gates, and let the cycle-back loop close the feedback
+                  gap when verification finds more work.
                 </p>
                 <p>
-                  Progress is saved to <code>.brr-workflow-state.json</code> after each stage.
-                  Interrupted workflows resume from where they left off. Use <code>--reset</code>
-                  to start fresh.
+                  Progress is saved to <code>.brr/state/workflows/&lt;name&gt;.json</code> after each
+                  stage, and event history is appended as JSON lines. Interrupted workflows resume
+                  from where they left off. Use <code>--reset</code> to start fresh.
                 </p>
                 <p>
                   Add <code>--notify</code> when you want a desktop notification for completion,
                   <code>.brr-failed</code> stops, and workflow errors.
                 </p>
               </div>
-              <pre class="config-block"><code>stages:
-  - prompt: prepare
-    max: 2
-  - prompt: work
+              <pre class="config-block"><code>version: 2
+description: "requirements -&gt; verified, reviewed code"
+
+defaults:
+  profile: claude
+  max: 3
+
+cycle:
+  target: build
+  max: 3
+
+stages:
+  - id: build
+    type: agent
+    prompt: build
     max: 100
-    cycle: true
-  - prompt: check
-    max: 2
-max_cycles: 3</code></pre>
+
+  - id: check
+    type: command
+    command: ["make", "check"]</code></pre>
             </div>
           </section>
 
@@ -229,7 +252,7 @@ max_cycles: 3</code></pre>
                 <p class="signal-name">.brr-cycle</p>
                 <p>
                   In a workflow, the agent creates this file when another pass should restart
-                  from the stage marked <code>cycle: true</code>. brr removes the file after it
+                  from <code>cycle.target</code>. brr removes the file after it
                   handles the signal.
                 </p>
               </div>
@@ -242,11 +265,11 @@ max_cycles: 3</code></pre>
                 </p>
               </div>
               <div class="signal-item">
-                <p class="signal-name">.brr-workflow-state.json</p>
+                <p class="signal-name">.brr/state/workflows/</p>
                 <p>
-                  Tracks workflow progress for resume, including the next stage, cycle count,
-                  and starting git SHA. Written by <code>brr workflow</code> after each stage.
-                  Deleted on completion. Use <code>--reset</code> to discard and start fresh.
+                  Tracks workflow progress for resume and JSONL event history, including stage status,
+                  cycle count, and starting git SHA. Written by <code>brr workflow run</code>.
+                  State files are deleted on completion; event logs remain for debugging. Use <code>--reset</code> to discard saved state.
                   Added to .gitignore by <code>brr init</code>.
                 </p>
               </div>

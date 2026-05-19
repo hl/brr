@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -22,6 +23,50 @@ func newTestRootCmd() *cobra.Command {
 	cmd.Flags().IntP("max", "m", 0, "max iterations")
 	cmd.Flags().StringP("profile", "p", "", "profile name")
 	cmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the loop stops")
+	return cmd
+}
+
+func newTestWorkflowRunCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "run <name>",
+		Args:         cobra.ExactArgs(1),
+		RunE:         runWorkflow,
+		SilenceUsage: true,
+	}
+	cmd.Flags().StringP("profile", "p", "", "profile name")
+	cmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the workflow completes")
+	cmd.Flags().Bool("reset", false, "discard saved progress and start from the first stage")
+	return cmd
+}
+
+func newTestWorkflowValidateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "validate <name>",
+		Args:         cobra.ExactArgs(1),
+		RunE:         validateWorkflow,
+		SilenceUsage: true,
+	}
+	cmd.Flags().StringP("profile", "p", "", "profile name")
+	return cmd
+}
+
+func newTestWorkflowStatusCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "status [name]",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         statusWorkflow,
+		SilenceUsage: true,
+	}
+}
+
+func newTestWorkflowInitCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "init <name>",
+		Args:         cobra.ExactArgs(1),
+		RunE:         initWorkflow,
+		SilenceUsage: true,
+	}
+	cmd.Flags().String("template", "ship", "workflow template to copy")
 	return cmd
 }
 
@@ -75,6 +120,28 @@ profiles:
 	if err := os.WriteFile(".brr.yaml", []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeWorkflow(t *testing.T) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(".brr", "workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(".brr", "workflows", "ship.yaml"), []byte(`version: 2
+stages:
+  - id: check
+    type: command
+    command: `+commandYAML()+`
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func commandYAML() string {
+	if runtime.GOOS == "windows" {
+		return `["cmd", "/c", "exit 0"]`
+	}
+	return `["true"]`
 }
 
 func TestRunIntegrationSuccess(t *testing.T) {
@@ -234,6 +301,70 @@ func TestRunIntegrationNotifyFlag(t *testing.T) {
 	cmd.SetArgs([]string{"hello world", "-m", "1", "-n"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error with --notify: %v", err)
+	}
+}
+
+func TestWorkflowValidateIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeTestConfig(t)
+	writeWorkflow(t)
+
+	cmd := newTestWorkflowValidateCmd()
+	cmd.SetArgs([]string{"ship"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+}
+
+func TestWorkflowRunIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeTestConfig(t)
+	writeWorkflow(t)
+
+	cmd := newTestWorkflowRunCmd()
+	cmd.SetArgs([]string{"ship"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected workflow run error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(".brr", "state", "workflows", "ship.events.jsonl")); err != nil {
+		t.Fatalf("expected workflow events file: %v", err)
+	}
+}
+
+func TestWorkflowStatusIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(filepath.Join(".brr", "state", "workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(".brr", "state", "workflows", "ship.json"), []byte(`{
+  "schema_version": 2,
+  "workflow": "ship",
+  "run_id": "abc",
+  "started_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:00Z",
+  "next_stage_id": "check",
+  "stages": [{"id": "check", "type": "command", "status": "pending"}]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newTestWorkflowStatusCmd()
+	cmd.SetArgs([]string{"ship"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected status error: %v", err)
+	}
+}
+
+func TestWorkflowInitIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	cmd := newTestWorkflowInitCmd()
+	cmd.SetArgs([]string{"ship"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected init error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(".brr", "workflows", "ship.yaml")); err != nil {
+		t.Fatalf("expected workflow file: %v", err)
 	}
 }
 

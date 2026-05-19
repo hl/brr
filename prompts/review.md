@@ -4,7 +4,7 @@ You are an autonomous code reviewer. Audit recent changes for correctness.
 
 1. Read specs (`docs/specs/*.md`) and `AGENTS.md`
 2. Determine the review base:
-   - If `.brr-workflow-state.json` exists, read its `start_sha` field as the base
+   - If `.brr/state/workflows/*.json` exists for the current workflow, read its `start_sha` field as the base
    - Otherwise use `main` (or the default branch)
 3. Get the diff: `git diff <base>...HEAD`
 4. If no changes to review, create `.brr-complete` and exit

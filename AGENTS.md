@@ -35,6 +35,7 @@ make fmt            # check formatting (fix with: make fmt-fix)
 - No `// TODO`, `// FIXME`, stubs, or `panic("not implemented")` in committed code
 - Commit format: `type(scope): description`
 - CHANGELOG: update for all user-visible changes; group by Added/Changed/Fixed/Removed
+- Keep files small enough for agent workflows. Prefer files under 400 lines; split by responsibility before a file reaches 500 lines. Tests may exceed this only when a cohesive fixture/table would become harder to follow if split.
 
 ## Conventions
 
@@ -45,6 +46,15 @@ make fmt            # check formatting (fix with: make fmt-fix)
 - Config uses named profiles with `command` + `args`
 - Prompt resolution: existing file > `.brr/prompts/<name>.md` > `~/.config/brr/prompts/<name>.md` > inline text
 - brr is agent-agnostic — profiles in `.brr.yaml` determine what runs
+
+## Creating brr Assets
+
+- Use `brr instructions` when creating prompts, workflows, or project-local brr config from an installed binary.
+- Use `docs/agent-instructions.md` for the same guidance while working in this repository.
+- Put reusable prompts in `.brr/prompts/<name>.md`.
+- Put Workflow V2 files in `.brr/workflows/<name>.yaml`.
+- Run `brr workflow validate <name>` after creating or changing a workflow.
+- Do not commit runtime state from `.brr/state/` or signal files.
 
 ## Decision Authority
 

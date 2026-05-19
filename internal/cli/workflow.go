@@ -8,48 +8,71 @@ import (
 	"github.com/hl/brr/internal/config"
 	"github.com/hl/brr/internal/engine"
 	"github.com/hl/brr/internal/notify"
+	"github.com/hl/brr/internal/ui"
 	"github.com/hl/brr/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
 var workflowCmd = &cobra.Command{
-	Use:   "workflow <name>",
-	Short: "Run a multi-stage workflow",
-	Long: `Run a multi-stage workflow defined in .brr/workflows/<name>.yaml.
+	Use:   "workflow",
+	Short: "Manage YAML workflows",
+	Long: `Manage versioned workflows defined in .brr/workflows/<name>.yaml.
 
-Each stage runs the loop engine with its own prompt and iteration limit.
-The workflow cycles back to a designated stage when any stage creates
-.brr-cycle.
+Workflows are YAML orchestration files with explicit stage IDs and stage
+types. Agent stages run brr's loop engine with a prompt. Command stages run a
+deterministic argv command as a gate. Workflow state is saved under
+.brr/state/workflows/ for resume, status, and debugging.`,
+}
 
-Progress is saved to .brr-workflow-state.json after each stage. If the
-workflow is interrupted or paused for approval, re-running the same command
-resumes from where it left off. Use --reset to start from scratch.
-
-Example workflow:
-  stages:
-    - prompt: prepare
-      max: 2
-    - prompt: work
-      max: 100
-      cycle: true
-    - prompt: check
-      max: 2
-  max_cycles: 3`,
+var workflowRunCmd = &cobra.Command{
+	Use:          "run <name>",
+	Short:        "Run a multi-stage workflow",
 	Args:         cobra.ExactArgs(1),
 	RunE:         runWorkflow,
 	SilenceUsage: true,
 }
 
+var workflowValidateCmd = &cobra.Command{
+	Use:          "validate <name>",
+	Short:        "Validate a workflow without running it",
+	Args:         cobra.ExactArgs(1),
+	RunE:         validateWorkflow,
+	SilenceUsage: true,
+}
+
+var workflowStatusCmd = &cobra.Command{
+	Use:          "status [name]",
+	Short:        "Show saved workflow state",
+	Args:         cobra.MaximumNArgs(1),
+	RunE:         statusWorkflow,
+	SilenceUsage: true,
+}
+
+var workflowInitCmd = &cobra.Command{
+	Use:          "init <name>",
+	Short:        "Create a workflow from a template",
+	Args:         cobra.ExactArgs(1),
+	RunE:         initWorkflow,
+	SilenceUsage: true,
+}
+
 func init() {
-	workflowCmd.Flags().StringP("profile", "p", "", "default profile for all stages (overridden by per-stage profile)")
-	workflowCmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the workflow completes")
-	workflowCmd.Flags().Bool("reset", false, "discard saved progress and start from the first stage")
+	workflowRunCmd.Flags().StringP("profile", "p", "", "default profile for agent stages")
+	workflowRunCmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the workflow completes")
+	workflowRunCmd.Flags().Bool("reset", false, "discard saved progress and start from the first stage")
+
+	workflowValidateCmd.Flags().StringP("profile", "p", "", "default profile for agent stages")
+	workflowInitCmd.Flags().String("template", "ship", "workflow template to copy")
+
+	workflowCmd.AddCommand(workflowRunCmd)
+	workflowCmd.AddCommand(workflowValidateCmd)
+	workflowCmd.AddCommand(workflowStatusCmd)
+	workflowCmd.AddCommand(workflowInitCmd)
 	rootCmd.AddCommand(workflowCmd)
 }
 
 func runWorkflow(cmd *cobra.Command, args []string) error {
 	name := args[0]
-
 	doNotify, err := cmd.Flags().GetBool("notify")
 	if err != nil {
 		return fmt.Errorf("reading --notify flag: %w", err)
@@ -63,34 +86,16 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	data, err := workflow.Resolve(name)
+	wf, cfg, profileFlag, err := loadWorkflowForRun(cmd, name, true)
 	if err != nil {
 		return returnWorkflowError(err)
 	}
-
-	wf, err := workflow.Load(data)
-	if err != nil {
-		return returnWorkflowError(err)
-	}
-
-	cfg, err := config.Load()
-	if err != nil {
-		return returnWorkflowError(fmt.Errorf("loading config: %w", err))
-	}
-
-	profileFlag, err := cmd.Flags().GetString("profile")
-	if err != nil {
-		return returnWorkflowError(fmt.Errorf("reading --profile flag: %w", err))
-	}
-
 	reset, err := cmd.Flags().GetBool("reset")
 	if err != nil {
 		return returnWorkflowError(fmt.Errorf("reading --reset flag: %w", err))
 	}
 
 	printBanner()
-
-	// Acquire lock for the entire workflow
 	lf, err := engine.AcquireLock()
 	if err != nil {
 		return returnWorkflowError(err)
@@ -142,6 +147,61 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 	if errors.Is(runErr, engine.ErrInterrupted) {
 		return engine.ErrInterrupted
 	}
-
 	return runErr
+}
+
+func validateWorkflow(cmd *cobra.Command, args []string) error {
+	name := args[0]
+	if _, _, _, err := loadWorkflowForRun(cmd, name, true); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "  %s%sWorkflow %q is valid%s\n", ui.Bold, ui.Green, name, ui.Reset)
+	return nil
+}
+
+func statusWorkflow(cmd *cobra.Command, args []string) error {
+	name := ""
+	if len(args) == 1 {
+		name = args[0]
+	}
+	return workflow.Status(name, os.Stderr)
+}
+
+func initWorkflow(cmd *cobra.Command, args []string) error {
+	template, err := cmd.Flags().GetString("template")
+	if err != nil {
+		return fmt.Errorf("reading --template flag: %w", err)
+	}
+	if err := workflow.InitTemplate(args[0], template); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "  Created .brr/workflows/%s.yaml from %s template\n", args[0], template)
+	return nil
+}
+
+func loadWorkflowForRun(cmd *cobra.Command, name string, resolvePrompts bool) (workflow.Workflow, config.Config, string, error) {
+	data, err := workflow.Resolve(name)
+	if err != nil {
+		return workflow.Workflow{}, config.Config{}, "", err
+	}
+	wf, err := workflow.Load(data)
+	if err != nil {
+		return workflow.Workflow{}, config.Config{}, "", err
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return workflow.Workflow{}, config.Config{}, "", fmt.Errorf("loading config: %w", err)
+	}
+	profileFlag, err := cmd.Flags().GetString("profile")
+	if err != nil {
+		return workflow.Workflow{}, config.Config{}, "", fmt.Errorf("reading --profile flag: %w", err)
+	}
+	var resolver func(string) (string, error)
+	if resolvePrompts {
+		resolver = resolvePrompt
+	}
+	if err := workflow.ValidateRuntime(wf, cfg, profileFlag, resolver); err != nil {
+		return workflow.Workflow{}, config.Config{}, "", err
+	}
+	return wf, cfg, profileFlag, nil
 }
