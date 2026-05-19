@@ -77,6 +77,7 @@ make build</code></pre>
                 <p class="heading">Usage</p>
                 <pre><code>brr &lt;prompt&gt; [flags]
 brr init [--force]
+brr instructions
 brr workflow run &lt;name&gt; [flags]
 brr workflow validate &lt;name&gt;
 brr workflow status [name]
@@ -85,10 +86,11 @@ brr [command]</code></pre>
               </div>
               <div class="help-panel">
                 <p class="heading">Available Commands</p>
-                <pre><code>completion  Generate the autocompletion script
-help        Help about any command
-init        Scaffold a project for brr
-workflow    Manage YAML workflows</code></pre>
+                <pre><code>completion    Generate the autocompletion script
+help          Help about any command
+init          Scaffold a project for brr
+instructions  Print agent setup instructions
+workflow      Manage YAML workflows</code></pre>
               </div>
               <div class="help-panel">
                 <p class="heading">Flags</p>
@@ -127,6 +129,10 @@ workflow    Manage YAML workflows</code></pre>
               <div class="inline-card">
                 <p class="label">notify when done</p>
                 <pre><code>brr task --max 20 --notify</code></pre>
+              </div>
+              <div class="inline-card">
+                <p class="label">print agent setup guide</p>
+                <pre><code>brr instructions</code></pre>
               </div>
               <div class="inline-card">
                 <p class="label">run a workflow</p>

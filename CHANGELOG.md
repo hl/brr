@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Workflow V2 schema with explicit stage IDs, agent and command stage types, top-level cycle configuration, strict validation, per-workflow state, JSONL event logs, and workflow `run`, `validate`, `status`, and `init` subcommands.
+- `brr instructions`, which prints agent-facing setup guidance for creating project-local brr prompts, workflows, and config from an installed binary.
 
 ### Changed
 

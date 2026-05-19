@@ -41,6 +41,9 @@ brr workflow init ship
 brr workflow validate ship
 brr workflow run ship
 brr workflow status ship
+
+# Print agent-facing setup instructions
+brr instructions
 ```
 
 ## Configuration
@@ -100,6 +103,8 @@ You are one iteration of a loop. Do one unit of work, then exit.
 ```
 
 Put prompts in `.brr/prompts/` (per-project) or `<os-config-dir>/brr/prompts/` (global). Then `brr task` resolves to `.brr/prompts/task.md`. Or point at any file: `brr ./my-prompt.md`.
+
+Agents that need to create project-local brr prompts, workflows, or config can run `brr instructions` from any installed binary. The same guidance is also available in [`docs/agent-instructions.md`](docs/agent-instructions.md).
 
 ## Workflows
 

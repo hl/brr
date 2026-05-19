@@ -47,6 +47,15 @@ make fmt            # check formatting (fix with: make fmt-fix)
 - Prompt resolution: existing file > `.brr/prompts/<name>.md` > `~/.config/brr/prompts/<name>.md` > inline text
 - brr is agent-agnostic — profiles in `.brr.yaml` determine what runs
 
+## Creating brr Assets
+
+- Use `brr instructions` when creating prompts, workflows, or project-local brr config from an installed binary.
+- Use `docs/agent-instructions.md` for the same guidance while working in this repository.
+- Put reusable prompts in `.brr/prompts/<name>.md`.
+- Put Workflow V2 files in `.brr/workflows/<name>.yaml`.
+- Run `brr workflow validate <name>` after creating or changing a workflow.
+- Do not commit runtime state from `.brr/state/` or signal files.
+
 ## Decision Authority
 
 - Routine implementation choices: proceed without approval
