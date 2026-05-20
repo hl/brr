@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release"
+  short_description: "Prepare and verify brr releases"
+  default_prompt: "Use $release to prepare a new brr version, run release checks, and stop before publishing."
