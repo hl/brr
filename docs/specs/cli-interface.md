@@ -12,7 +12,7 @@ The CLI interface is the user-facing entry point to brr. It parses commands and 
 4. The `--version` flag prints the version string and exits. It does not require a prompt or a valid config.
 5. The `--notify` / `-n` flag enables desktop notifications on loop termination. Off by default.
 6. The `init` subcommand scaffolds a new brr project. It accepts a `--force` flag to overwrite existing files.
-7. The `workflow` command manages multi-stage pipelines through explicit subcommands. `workflow run` accepts `--profile` (default profile for agent stages), `--notify` (notification on completion), and `--reset` (discard saved progress). `workflow validate` accepts `--profile`. `workflow init` accepts `--template`.
+7. The `workflow` command manages multi-stage pipelines through explicit subcommands. `workflow run` accepts `--profile` (default profile for agent stages), `--notify` (notification on completion), and `--reset` (discard saved progress). `workflow validate` accepts `--profile`. `workflow status` accepts `--watch` and `--interval` to redraw saved progress live. `workflow init` accepts `--template`.
 8. The `instructions` subcommand prints Markdown guidance to stdout so users and agents can pipe it into project docs. It does not require project config.
 9. On startup, brr prints an ASCII banner followed by a summary of the resolved configuration (profile name, command, max iterations). Runtime CLI output (banner, config summary, status messages) is written to stderr so that stdout is reserved for agent output. The `instructions` subcommand is the explicit exception because its primary output is pipeable documentation.
 10. When the engine returns an interrupted stop reason (from Ctrl+C or SIGTERM), brr exits with code 130.

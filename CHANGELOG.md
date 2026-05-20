@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Workflow V2 schema with explicit stage IDs, agent and command stage types, top-level cycle configuration, strict validation, per-workflow state, JSONL event logs, and workflow `run`, `validate`, `status`, and `init` subcommands.
+- `brr workflow status --watch`, which redraws saved workflow state with an animated running-stage marker.
+- `brr workflow run` now prints a live workflow flow line with stage state markers and cycle-back context.
 - `brr instructions`, which prints agent-facing setup guidance for creating project-local brr prompts, workflows, and config from an installed binary.
 
 ### Changed
 
 - Workflow state now lives under `.brr/state/workflows/`, and `brr init` creates and gitignores `.brr/state/`.
+- Workflow status output now renders a compact stage-by-stage pipeline view instead of a raw state field dump.
 - The bundled `ship` workflow now uses Workflow V2 and includes a deterministic `make check` command gate.
 
 ### Removed

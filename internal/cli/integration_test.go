@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -51,12 +52,15 @@ func newTestWorkflowValidateCmd() *cobra.Command {
 }
 
 func newTestWorkflowStatusCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:          "status [name]",
 		Args:         cobra.MaximumNArgs(1),
 		RunE:         statusWorkflow,
 		SilenceUsage: true,
 	}
+	cmd.Flags().BoolP("watch", "w", false, "redraw saved workflow state until it is cleared")
+	cmd.Flags().Duration("interval", time.Second, "refresh interval for --watch")
+	return cmd
 }
 
 func newTestWorkflowInitCmd() *cobra.Command {

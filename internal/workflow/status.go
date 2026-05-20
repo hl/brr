@@ -7,7 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/hl/brr/internal/ui"
 )
+
+var statusSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 func Status(name string, w io.Writer) error {
 	if name != "" {
@@ -56,25 +60,85 @@ func printStatus(name string, w io.Writer) error {
 }
 
 func writeStatus(w io.Writer, state *State) error {
-	lines := []string{
-		fmt.Sprintf("workflow: %s", state.Workflow),
-		fmt.Sprintf("run_id: %s", state.RunID),
-		fmt.Sprintf("next_stage: %s", state.NextStageID),
-		fmt.Sprintf("cycle_count: %d", state.CycleCount),
-		fmt.Sprintf("started_at: %s", state.StartedAt.Format(time.RFC3339)),
-		fmt.Sprintf("updated_at: %s", state.UpdatedAt.Format(time.RFC3339)),
+	return writeStatusFrame(w, state, "")
+}
+
+func WatchStatus(name string, w io.Writer, interval time.Duration) error {
+	if name == "" {
+		return fmt.Errorf("workflow name is required for watch mode")
 	}
-	for _, line := range lines {
-		if _, err := fmt.Fprintln(w, line); err != nil {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	if interval <= 0 {
+		interval = time.Second
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	frame := 0
+	for {
+		state, err := (store{name: name}).load()
+		if err != nil {
+			if os.IsNotExist(err) {
+				_, err := fmt.Fprintf(w, "\033[H\033[2JNo state found for workflow %q.\n", name)
+				return err
+			}
+			return fmt.Errorf("reading workflow state: %w", err)
+		}
+		if _, err := fmt.Fprint(w, "\033[H\033[2J"); err != nil {
 			return err
 		}
-	}
-	for _, stage := range state.Stages {
-		if _, err := fmt.Fprintf(w, "- %s: %s", stage.ID, stage.Status); err != nil {
+		if err := writeStatusFrame(w, state, statusSpinnerFrames[frame%len(statusSpinnerFrames)]); err != nil {
 			return err
+		}
+		frame++
+		<-ticker.C
+	}
+}
+
+func writeStatusFrame(w io.Writer, state *State, spinner string) error {
+	if _, err := fmt.Fprintf(w, "%s%sworkflow%s %s\n", ui.Bold, ui.Cyan, ui.Reset, state.Workflow); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %srun:%s     %s\n", ui.Dim, ui.Reset, state.RunID); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %snext:%s    %s\n", ui.Dim, ui.Reset, emptyLabel(state.NextStageID)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %scycle:%s   %d\n", ui.Dim, ui.Reset, state.CycleCount); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %sstarted:%s %s\n", ui.Dim, ui.Reset, formatStatusTime(state.StartedAt)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %supdated:%s %s\n\n", ui.Dim, ui.Reset, formatStatusTime(state.UpdatedAt)); err != nil {
+		return err
+	}
+
+	idWidth := maxStageIDWidth(state.Stages)
+	for _, stage := range state.Stages {
+		icon := stageStatusIcon(stage.Status, spinner)
+		if _, err := fmt.Fprintf(w, "  %s %-*s  %s%-11s%s", icon, idWidth, stage.ID, stageStatusColor(stage.Status), stage.Status, ui.Reset); err != nil {
+			return err
+		}
+		if stage.Duration > 0 {
+			if _, err := fmt.Fprintf(w, "  %8s", stage.Duration.Round(time.Second)); err != nil {
+				return err
+			}
+		} else {
+			if _, err := fmt.Fprint(w, "          "); err != nil {
+				return err
+			}
+		}
+		if detail := stageStatusDetail(stage); detail != "" {
+			if _, err := fmt.Fprintf(w, "  %s%s%s", ui.Dim, detail, ui.Reset); err != nil {
+				return err
+			}
 		}
 		if stage.Reason != "" {
-			if _, err := fmt.Fprintf(w, " (%s)", stage.Reason); err != nil {
+			if _, err := fmt.Fprintf(w, "  %s(%s)%s", ui.Dim, stage.Reason, ui.Reset); err != nil {
 				return err
 			}
 		}
@@ -83,4 +147,81 @@ func writeStatus(w io.Writer, state *State) error {
 		}
 	}
 	return nil
+}
+
+func formatStatusTime(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format(time.RFC3339)
+}
+
+func emptyLabel(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func maxStageIDWidth(stages []StageStatus) int {
+	width := 1
+	for _, stage := range stages {
+		if len(stage.ID) > width {
+			width = len(stage.ID)
+		}
+	}
+	return width
+}
+
+func stageStatusIcon(status, spinner string) string {
+	switch status {
+	case "completed":
+		return ui.Green + "✓" + ui.Reset
+	case "running":
+		if spinner != "" {
+			return ui.Cyan + spinner + ui.Reset
+		}
+		return ui.Cyan + "▶" + ui.Reset
+	case "failed", "error":
+		return ui.Red + "✗" + ui.Reset
+	case "approval":
+		return ui.Yellow + "⏸" + ui.Reset
+	case "cycle":
+		return ui.Magenta + "↻" + ui.Reset
+	case "interrupted":
+		return ui.Yellow + "■" + ui.Reset
+	default:
+		return ui.Dim + "○" + ui.Reset
+	}
+}
+
+func stageStatusColor(status string) string {
+	switch status {
+	case "completed":
+		return ui.Green
+	case "running":
+		return ui.Cyan
+	case "failed", "error":
+		return ui.Red
+	case "approval", "interrupted":
+		return ui.Yellow
+	case "cycle":
+		return ui.Magenta
+	default:
+		return ui.Dim
+	}
+}
+
+func stageStatusDetail(stage StageStatus) string {
+	switch stage.Type {
+	case StageTypeAgent:
+		if stage.Profile != "" {
+			return fmt.Sprintf("agent %s via %s", stage.Prompt, stage.Profile)
+		}
+		return "agent " + stage.Prompt
+	case StageTypeCommand:
+		return strings.Join(stage.Command, " ")
+	default:
+		return stage.Type
+	}
 }
