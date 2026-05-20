@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] "Stage Fright" - 2026-05-20
+
 ### Added
 
 - Workflow V2 schema with explicit stage IDs, agent and command stage types, top-level cycle configuration, strict validation, per-workflow state, JSONL event logs, and workflow `run`, `validate`, `status`, and `init` subcommands.
 - `brr workflow status --watch`, which redraws saved workflow state with an animated running-stage marker.
 - `brr workflow run` now prints a live workflow flow line with stage state markers and cycle-back context.
 - `brr instructions`, which prints agent-facing setup guidance for creating project-local brr prompts, workflows, and config from an installed binary.
+- Project-local Codex release skill for preparing and verifying brr releases.
 
 ### Changed
 
