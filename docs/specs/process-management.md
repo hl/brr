@@ -10,7 +10,7 @@ Process management handles cross-platform subprocess spawning for the loop engin
 2. The resolved prompt text is piped to the subprocess's stdin.
 3. The subprocess's stdout and stderr are connected to the parent's stdout and stderr respectively. brr's own output (headers, status messages, diagnostics) is written to stderr so that agent stdout passes through uncontaminated.
 4. On Unix, the subprocess is created in a new process group (`Setpgid=true`) so that signals can be sent to the group via negative PID.
-5. On Windows, the subprocess is created with `CREATE_NEW_PROCESS_GROUP` so that console control events and `taskkill /T` target the child tree.
+5. On Windows, the subprocess is created with `CREATE_NEW_PROCESS_GROUP` so that console control events target the child process group and process-tree cleanup can target descendants.
 6. The engine tracks the currently running subprocess so that signal handlers can deliver signals to it.
 7. When the subprocess exits, the engine captures its exit code to determine success (0) or failure (non-zero).
 

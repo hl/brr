@@ -3,14 +3,16 @@
 package engine
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
-	"strconv"
 	"syscall"
+	"unsafe"
 )
 
 const createNewProcessGroup = 0x00000200
+
+var procGenerateConsoleCtrlEvent = modkernel32.NewProc("GenerateConsoleCtrlEvent")
+
+const ctrlBreakEvent = 1
 
 // setProcAttr configures the command to run in a new process group on Windows
 // so that console control events and tree kills target the child tree only.
@@ -20,53 +22,86 @@ func setProcAttr(cmd *exec.Cmd) {
 	}
 }
 
+// killProcessTree recursively terminates all active descendants of parentPID.
+// If killParent is true, it also terminates parentPID itself.
+func killProcessTree(parentPID uint32, killParent bool) {
+	snapshot, err := syscall.CreateToolhelp32Snapshot(syscall.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return
+	}
+	defer syscall.CloseHandle(snapshot)
+
+	var pe syscall.ProcessEntry32
+	pe.Size = uint32(unsafe.Sizeof(pe))
+
+	err = syscall.Process32First(snapshot, &pe)
+	if err != nil {
+		return
+	}
+
+	children := make(map[uint32][]uint32)
+	for {
+		children[pe.ParentProcessID] = append(children[pe.ParentProcessID], pe.ProcessID)
+		err = syscall.Process32Next(snapshot, &pe)
+		if err != nil {
+			break
+		}
+	}
+
+	var terminateTree func(uint32)
+	terminateTree = func(pid uint32) {
+		for _, childPID := range children[pid] {
+			terminateTree(childPID)
+		}
+		if pid != parentPID || killParent {
+			h, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, pid)
+			if err == nil {
+				_ = syscall.TerminateProcess(h, 1)
+				_ = syscall.CloseHandle(h)
+			}
+		}
+	}
+
+	terminateTree(parentPID)
+}
+
 // reapGroup cleans up any orphaned processes remaining in the child's process
-// tree after the child has exited. Uses taskkill /T /F to force-terminate
-// the entire tree.
+// tree after the child has exited. Uses pure Go Toolhelp API traversal.
 func reapGroup(cmd *exec.Cmd) {
 	if cmd.Process == nil {
 		return
 	}
-	pid := strconv.Itoa(cmd.Process.Pid)
-	var taskkill string
-	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
-		taskkill = filepath.Join(systemRoot, "System32", "taskkill.exe")
-	} else {
-		taskkill = "taskkill.exe"
+	// The parent process is already dead at this stage, so we only terminate descendants.
+	killProcessTree(uint32(cmd.Process.Pid), false)
+}
+
+func sendConsoleBreak(pid uint32) error {
+	r1, _, errno := procGenerateConsoleCtrlEvent.Call(uintptr(ctrlBreakEvent), uintptr(pid))
+	if r1 != 0 {
+		return nil
 	}
-	kill := exec.Command(taskkill, "/T", "/F", "/PID", pid)
-	_ = kill.Run()
+	if errno != syscall.Errno(0) {
+		return errno
+	}
+	return syscall.EINVAL
 }
 
 // killGroup sends a termination signal to the child process tree on Windows.
-// For SIGINT: attempts graceful tree kill via taskkill, then falls back to Process.Kill.
-// For SIGKILL/SIGTERM: uses taskkill /T /F to force-terminate the entire process tree.
 func killGroup(cmd *exec.Cmd, sig syscall.Signal) error {
 	if cmd.Process == nil {
 		return nil
 	}
-	pid := strconv.Itoa(cmd.Process.Pid)
-	var taskkill string
-	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
-		taskkill = filepath.Join(systemRoot, "System32", "taskkill.exe")
-	} else {
-		taskkill = "taskkill.exe"
-	}
+	pid := uint32(cmd.Process.Pid)
 
 	switch sig {
 	case syscall.SIGINT:
-		// Graceful tree kill (no /F) — gives the child a chance to clean up
-		kill := exec.Command(taskkill, "/T", "/PID", pid)
-		if err := kill.Run(); err != nil {
+		if err := sendConsoleBreak(pid); err != nil {
 			return cmd.Process.Kill()
 		}
 		return nil
 	default:
-		// Force kill the entire process tree
-		kill := exec.Command(taskkill, "/T", "/F", "/PID", pid)
-		if err := kill.Run(); err != nil {
-			return cmd.Process.Kill()
-		}
-		return nil
+		// Force kill the entire process tree including the parent
+		killProcessTree(pid, true)
+		return cmd.Process.Kill()
 	}
 }

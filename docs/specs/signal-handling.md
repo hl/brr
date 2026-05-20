@@ -11,8 +11,8 @@ Signal handling defines how brr responds to OS interrupts (Ctrl+C / SIGINT) and 
 3. The third SIGINT sends SIGKILL to the entire child process group, forcefully terminating the subprocess tree.
 4. SIGTERM is forwarded immediately to the child process group as SIGTERM. The engine waits for the current child process to exit (it should terminate in response to the forwarded signal), then exits the loop.
 5. All signals target the child process group (not just the direct child process), ensuring the entire subprocess tree receives the signal.
-6. On Windows, where SIGTERM is not deliverable, the equivalent behavior uses `taskkill` for process tree management: graceful kill without `/F` for interrupt-level signals, force kill with `/F` for SIGKILL-level signals.
-7. If the process-group signal delivery fails on Windows, the system falls back to killing the direct child process.
+6. On Windows, where Unix signals are not deliverable, the equivalent interrupt behavior sends a console break event to the child process group, while force-kill behavior terminates the process tree.
+7. If graceful process-group signal delivery fails on Windows, the system falls back to killing the direct child process.
 
 ## Constraints
 
@@ -31,7 +31,7 @@ Signal handling defines how brr responds to OS interrupts (Ctrl+C / SIGINT) and 
 - [ ] Third Ctrl+C force-kills the child process group.
 - [ ] SIGTERM is forwarded immediately to the child process group.
 - [ ] Signals work correctly on Unix (Linux/macOS).
-- [ ] Signals work correctly on Windows with taskkill fallback.
+- [ ] Signals work correctly on Windows with console control events and process-tree cleanup.
 - [ ] No child process leak after any signal sequence.
 - [ ] All requirements have corresponding tests that pass.
 - [ ] Existing tests continue to pass.
