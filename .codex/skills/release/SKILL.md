@@ -1,6 +1,6 @@
 ---
 name: "release"
-description: "Use when the user asks to release, cut, prepare, tag, or publish a new version of brr. Handles local SemVer release prep for this GoReleaser project, including CHANGELOG promotion, required checks, release commits, and local tags. Requires explicit approval before externally visible publishing such as pushing commits/tags or running a live GoReleaser release."
+description: "Use when the user asks to release, cut, prepare, tag, or publish a new version of brr. Handles SemVer release prep and publishing for this GoReleaser project, including CHANGELOG promotion, required checks, release commits, annotated tags, GitHub Releases, and Homebrew tap updates. Requires explicit approval before externally visible publishing such as pushing commits/tags or running a live GoReleaser release."
 ---
 
 # brr Release
@@ -15,6 +15,10 @@ description: "Use when the user asks to release, cut, prepare, tag, or publish a
 ## Project Release Shape
 
 - Version comes from Git tags via GoReleaser ldflags in `.goreleaser.yaml`; do not hardcode it in Go.
+- The canonical remote branch is `main`. Local worktrees may be on `master`,
+  detached at `origin/main`, or on a release branch, so publish the current
+  release commit with `git push origin HEAD:main` instead of `git push origin
+  main`.
 - Changelog follows Keep a Changelog with SemVer and project codenames:
   - `## [x.y.z] "Codename" - YYYY-MM-DD`
 - Previous release prep commits use:
@@ -51,19 +55,35 @@ description: "Use when the user asks to release, cut, prepare, tag, or publish a
 7. Create the local annotated tag:
    - `git tag -a vx.y.z -m "vx.y.z"`
 
-## Publish Stop
+## Publish
 
-Before publishing, summarize:
+Treat publishing as externally visible. If the user has not explicitly asked to
+publish or release, stop and summarize:
 
 - target version and tag
 - release commit
 - checks run and results
 - exact commands needed to publish
 
-Then ask for approval before running commands such as:
+When publishing is explicitly authorized, run:
 
 ```shell
-git push origin <branch>
+git push origin HEAD:main
 git push origin vx.y.z
-mise exec -- goreleaser release --clean
 ```
+
+Do not run `mise exec -- goreleaser release --clean` locally for normal
+publishing. The GitHub Actions release workflow is triggered by the pushed tag
+and runs GoReleaser with `GITHUB_TOKEN` and `TAP_GITHUB_TOKEN`.
+
+After pushing, verify:
+
+```shell
+gh run list --repo hl/brr --workflow release --limit 1
+gh run watch --repo hl/brr <run-id> --exit-status
+gh release view vx.y.z --repo hl/brr
+gh api repos/hl/homebrew-tap/contents/Formula/brr.rb --jq '.content' | base64 --decode
+```
+
+The release is complete only when the workflow succeeds, the GitHub release
+exists, and the Homebrew formula version and asset URLs point at `vx.y.z`.

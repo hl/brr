@@ -50,10 +50,10 @@ Use today's date. Only include sections that have entries.
 git add CHANGELOG.md
 git commit -m "chore(release): prepare vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z — Release Name"
-git push origin main
+git push origin HEAD:main
 git push origin vX.Y.Z
 ```
 
 ## 6. Verify
 
-Run `gh run list --repo hl/brr --limit 1` to show the workflow status. Tell the user the release workflow is running and link to https://github.com/hl/brr/actions.
+Run `gh run list --repo hl/brr --limit 1` to show the workflow status. After it finishes, verify the GitHub release exists and the Homebrew tap formula points at the new version.
