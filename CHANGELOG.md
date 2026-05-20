@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Hardened `.brr.lock` symlink protection on Unix and Windows using no-follow opens, `os.Lstat`, and `os.SameFile` validation to prevent symlink traversal and TOCTOU races.
+- Realigned signal file descriptions in `README.md`, `docs/index.html`, and CLI pause/resume output to reflect the automatic cleanup of signal files rather than instructing users to manually delete them.
+- Windows interrupt handling now preserves graceful second Ctrl+C behavior by sending a console break event before falling back to direct child termination.
 - Workflow state now lives under `.brr/state/workflows/`, and `brr init` creates and gitignores `.brr/state/`.
 - The bundled `ship` workflow now uses Workflow V2 and includes a deterministic `make check` command gate.
 
@@ -23,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Resolved a process leak on Windows where `reapGroup` failed to terminate orphaned background child processes (such as LSPs/MCP servers) once the main agent exited, using a pure Go recursive Toolhelp snapshot API traversal instead of an external `taskkill` call.
 - Landing page documentation now reflects the current CLI usage, workflow notification behavior, resume state, and safety guidance.
 
 ## [0.3.6] "Early Warnings" - 2026-05-03
