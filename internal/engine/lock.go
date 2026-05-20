@@ -24,7 +24,7 @@ func AcquireLock() (*os.File, error) {
 		return nil, fmt.Errorf("checking lock file: %w", err)
 	}
 
-	f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o644)
+	f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("creating lock file: %w", err)
 	}
@@ -35,9 +35,23 @@ func AcquireLock() (*os.File, error) {
 		return nil, err
 	}
 
+	fi3, err := os.Lstat(lockFile)
+	if err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("checking opened lock file: %w", err)
+	}
+	if !fi3.Mode().IsRegular() {
+		_ = f.Close()
+		return nil, fmt.Errorf("%s is not a regular file (symlinks/dirs not allowed)", lockFile)
+	}
+
 	if fi != nil && !os.SameFile(fi, fi2) {
 		_ = f.Close()
 		return nil, fmt.Errorf("lock file changed between stat and open")
+	}
+	if !os.SameFile(fi2, fi3) {
+		_ = f.Close()
+		return nil, fmt.Errorf("lock file changed between open and verification")
 	}
 
 	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)

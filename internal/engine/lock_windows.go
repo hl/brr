@@ -18,8 +18,9 @@ var (
 )
 
 const (
-	lockfileExclusiveLock   = 0x02
-	lockfileFailImmediately = 0x01
+	lockfileExclusiveLock    = 0x02
+	lockfileFailImmediately  = 0x01
+	fileFlagOpenReparsePoint = 0x00200000
 )
 
 func AcquireLock() (*os.File, error) {
@@ -32,10 +33,23 @@ func AcquireLock() (*os.File, error) {
 		return nil, fmt.Errorf("checking lock file: %w", err)
 	}
 
-	f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o644)
+	path, err := syscall.UTF16PtrFromString(lockFile)
 	if err != nil {
 		return nil, fmt.Errorf("creating lock file: %w", err)
 	}
+	h, err := syscall.CreateFile(
+		path,
+		syscall.GENERIC_READ|syscall.GENERIC_WRITE,
+		syscall.FILE_SHARE_READ|syscall.FILE_SHARE_WRITE|syscall.FILE_SHARE_DELETE,
+		nil,
+		syscall.OPEN_ALWAYS,
+		syscall.FILE_ATTRIBUTE_NORMAL|fileFlagOpenReparsePoint,
+		0,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating lock file: %w", err)
+	}
+	f := os.NewFile(uintptr(h), lockFile)
 
 	fi2, err := f.Stat()
 	if err != nil {
@@ -43,12 +57,26 @@ func AcquireLock() (*os.File, error) {
 		return nil, err
 	}
 
+	fi3, err := os.Lstat(lockFile)
+	if err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("checking opened lock file: %w", err)
+	}
+	if !fi3.Mode().IsRegular() {
+		_ = f.Close()
+		return nil, fmt.Errorf("%s is not a regular file (symlinks/dirs not allowed)", lockFile)
+	}
+
 	if fi != nil && !os.SameFile(fi, fi2) {
 		_ = f.Close()
 		return nil, fmt.Errorf("lock file changed between stat and open")
 	}
+	if !os.SameFile(fi2, fi3) {
+		_ = f.Close()
+		return nil, fmt.Errorf("lock file changed between open and verification")
+	}
 
-	h := syscall.Handle(f.Fd())
+	h = syscall.Handle(f.Fd())
 	ol := new(syscall.Overlapped)
 	r1, _, errno := procLockFileEx.Call(
 		uintptr(h),
