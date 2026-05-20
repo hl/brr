@@ -133,7 +133,7 @@ stages:
     command: ["make", "check"]
 ```
 
-Run workflows with `brr workflow run <name>`. Use `brr workflow validate <name>` before a long run, `brr workflow status [name]` to inspect saved progress, and `brr workflow init <name> --template ship` to copy the bundled requirements-to-review workflow.
+Run workflows with `brr workflow run <name>`, which prints the stage flow and current state as the run advances. Use `brr workflow validate <name>` before a long run, `brr workflow status [name]` to inspect saved progress, `brr workflow status <name> --watch` to follow the saved state live, and `brr workflow init <name> --template ship` to copy the bundled requirements-to-review workflow.
 
 Workflow progress is stored in `.brr/state/workflows/<name>.json`; event history is appended to `.brr/state/workflows/<name>.events.jsonl`. Successful runs delete the state file and keep the event log for debugging.
 

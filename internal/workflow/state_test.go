@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStatusPrintsSavedState(t *testing.T) {
@@ -23,8 +24,82 @@ func TestStatusPrintsSavedState(t *testing.T) {
 	if err := Status("ship", &out); err != nil {
 		t.Fatalf("status error: %v", err)
 	}
-	if !strings.Contains(out.String(), "workflow: ship") || !strings.Contains(out.String(), "next_stage: build") {
+	if !strings.Contains(out.String(), "workflow ship") || !strings.Contains(out.String(), "next:") || !strings.Contains(out.String(), "build") {
 		t.Fatalf("unexpected status output: %s", out.String())
+	}
+}
+
+func TestStatusPrintsVisualStageState(t *testing.T) {
+	t.Chdir(t.TempDir())
+	state := &State{
+		SchemaVersion: SchemaVersion,
+		Workflow:      "ship",
+		RunID:         "abc",
+		StartedAt:     testTime(),
+		UpdatedAt:     testTime(),
+		NextStageID:   "check",
+		Stages: []StageStatus{
+			{ID: "spec", Type: StageTypeAgent, Status: "completed", Duration: 2 * time.Second, Prompt: "spec", Profile: "codex"},
+			{ID: "check", Type: StageTypeCommand, Status: "running", Command: []string{"make", "check"}},
+			{ID: "review", Type: StageTypeAgent, Status: "pending", Prompt: "review"},
+		},
+	}
+	(store{name: "ship"}).save(state)
+
+	var out strings.Builder
+	if err := Status("ship", &out); err != nil {
+		t.Fatalf("status error: %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{"✓ spec", "▶ check", "○ review", "agent spec via codex", "make check"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected %q in status output:\n%s", want, got)
+		}
+	}
+}
+
+func TestStatusFrameUsesSpinnerForRunningStage(t *testing.T) {
+	state := &State{
+		Workflow:    "ship",
+		RunID:       "abc",
+		NextStageID: "build",
+		Stages: []StageStatus{
+			{ID: "build", Type: StageTypeCommand, Status: "running", Command: []string{"make", "check"}},
+		},
+	}
+	var out strings.Builder
+	if err := writeStatusFrame(&out, state, "*"); err != nil {
+		t.Fatalf("status frame error: %v", err)
+	}
+	if !strings.Contains(out.String(), "* build") {
+		t.Fatalf("expected spinner frame in status output:\n%s", out.String())
+	}
+}
+
+func TestRunDiagramShowsFlowAndCycleState(t *testing.T) {
+	wf := testWorkflow([]Stage{
+		{ID: "build", Type: StageTypeAgent, Prompt: "build"},
+		{ID: "check", Type: StageTypeCommand, Command: []string{"make", "check"}},
+		{ID: "review", Type: StageTypeAgent, Prompt: "review"},
+	}, &Cycle{Target: "build", Max: 3})
+	state := &State{
+		CycleCount: 1,
+		Stages: []StageStatus{
+			{ID: "build", Status: "completed"},
+			{ID: "check", Status: "running"},
+			{ID: "review", Status: "pending"},
+		},
+	}
+
+	var out strings.Builder
+	if err := writeRunDiagram(&out, wf, state, "*"); err != nil {
+		t.Fatalf("run diagram error: %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{"flow:", "✓ build", "* check", "○ review", "review ↺ build", "used 1"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected %q in run diagram:\n%s", want, got)
+		}
 	}
 }
 

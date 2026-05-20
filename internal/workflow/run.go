@@ -31,6 +31,7 @@ func Run(opts Options) (*engine.Result, error) {
 	printWorkflowSummary(opts.Workflow, opts.Name)
 	store.appendEvent(Event{RunID: state.RunID, Workflow: opts.Name, Time: time.Now().UTC(), Type: "workflow_started"})
 	store.save(state)
+	printRunDiagram(opts.Workflow, state, "")
 
 	for stageIdx < len(opts.Workflow.Stages) {
 		stage := opts.Workflow.Stages[stageIdx]
@@ -125,6 +126,7 @@ func handleCycle(opts Options, state *State, store store, stage Stage, result *e
 		ui.Bold, ui.Magenta, state.CycleCount, opts.Workflow.Cycle.Max, ui.Reset,
 		ui.Dim, state.NextStageID, ui.Reset,
 	)
+	printRunDiagram(opts.Workflow, state, "")
 	return nextIdx, false, nil
 }
 
@@ -136,6 +138,7 @@ func runStage(opts Options, state *State, store store, stage Stage, idx int) (*e
 	state.UpdatedAt = time.Now().UTC()
 	store.save(state)
 	store.appendEvent(Event{RunID: state.RunID, Workflow: opts.Name, Time: state.UpdatedAt, Type: "stage_started", StageID: stage.ID})
+	printRunDiagram(opts.Workflow, state, statusSpinnerFrames[idx%len(statusSpinnerFrames)])
 
 	result, err := executeStage(opts, stage)
 	duration := time.Since(start)
@@ -143,6 +146,7 @@ func runStage(opts Options, state *State, store store, stage Stage, idx int) (*e
 	state.UpdatedAt = time.Now().UTC()
 	store.save(state)
 	store.appendEvent(Event{RunID: state.RunID, Workflow: opts.Name, Time: state.UpdatedAt, Type: "stage_finished", StageID: stage.ID, Reason: stopReason(result)})
+	printRunDiagram(opts.Workflow, state, "")
 
 	if err != nil {
 		return result, fmt.Errorf("stage %s: %w", stage.ID, err)

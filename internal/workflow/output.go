@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -65,16 +66,6 @@ func printWorkflowSummary(wf Workflow, name string) {
 		fmt.Fprintf(os.Stderr, "  %scycle:%s   %s (max %d)\n", ui.Dim, ui.Reset, wf.Cycle.Target, wf.Cycle.Max)
 	}
 	fmt.Fprintln(os.Stderr)
-	for i, stage := range wf.Stages {
-		marker := " "
-		if wf.Cycle != nil && wf.Cycle.Target == stage.ID {
-			marker = "↻"
-		}
-		fmt.Fprintf(os.Stderr, "  %s %s%d.%s %s %s(%s)%s\n",
-			marker, ui.Bold, i+1, ui.Reset, stage.ID, ui.Dim, stage.Type, ui.Reset,
-		)
-	}
-	fmt.Fprintln(os.Stderr)
 }
 
 func printStageHeader(num, total int, stage Stage, cycle int, wf Workflow) {
@@ -91,4 +82,61 @@ func printStageHeader(num, total int, stage Stage, cycle int, wf Workflow) {
 		ui.Bold, ui.Cyan, num, total, stage.ID, ui.Reset,
 		ui.Dim, detail, cycleLabel, ui.Reset,
 	)
+}
+
+func printRunDiagram(wf Workflow, state *State, spinner string) {
+	_ = writeRunDiagram(os.Stderr, wf, state, spinner)
+}
+
+func writeRunDiagram(w io.Writer, wf Workflow, state *State, spinner string) error {
+	if _, err := fmt.Fprintf(w, "  %sflow:%s ", ui.Dim, ui.Reset); err != nil {
+		return err
+	}
+	for i, stage := range wf.Stages {
+		if i > 0 {
+			if _, err := fmt.Fprintf(w, " %s→%s ", ui.Dim, ui.Reset); err != nil {
+				return err
+			}
+		}
+		status := stageStatusByID(state, stage.ID)
+		icon := stageStatusIcon(status.Status, spinner)
+		if _, err := fmt.Fprintf(w, "%s %s", icon, stage.ID); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	if wf.Cycle != nil {
+		if _, err := fmt.Fprintf(w, "  %scycle:%s %s %s↺%s %s (max %d, used %d)\n",
+			ui.Dim, ui.Reset,
+			workflowLastStageID(wf),
+			ui.Magenta, ui.Reset,
+			wf.Cycle.Target,
+			wf.Cycle.Max,
+			state.CycleCount,
+		); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+func stageStatusByID(state *State, id string) StageStatus {
+	if state != nil {
+		for _, stage := range state.Stages {
+			if stage.ID == id {
+				return stage
+			}
+		}
+	}
+	return StageStatus{ID: id, Status: "pending"}
+}
+
+func workflowLastStageID(wf Workflow) string {
+	if len(wf.Stages) == 0 {
+		return "-"
+	}
+	return wf.Stages[len(wf.Stages)-1].ID
 }

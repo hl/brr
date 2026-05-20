@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/hl/brr/internal/config"
 	"github.com/hl/brr/internal/engine"
@@ -62,6 +63,8 @@ func init() {
 	workflowRunCmd.Flags().Bool("reset", false, "discard saved progress and start from the first stage")
 
 	workflowValidateCmd.Flags().StringP("profile", "p", "", "default profile for agent stages")
+	workflowStatusCmd.Flags().BoolP("watch", "w", false, "redraw saved workflow state until it is cleared")
+	workflowStatusCmd.Flags().Duration("interval", time.Second, "refresh interval for --watch")
 	workflowInitCmd.Flags().String("template", "ship", "workflow template to copy")
 
 	workflowCmd.AddCommand(workflowRunCmd)
@@ -163,6 +166,17 @@ func statusWorkflow(cmd *cobra.Command, args []string) error {
 	name := ""
 	if len(args) == 1 {
 		name = args[0]
+	}
+	watch, err := cmd.Flags().GetBool("watch")
+	if err != nil {
+		return fmt.Errorf("reading --watch flag: %w", err)
+	}
+	if watch {
+		interval, err := cmd.Flags().GetDuration("interval")
+		if err != nil {
+			return fmt.Errorf("reading --interval flag: %w", err)
+		}
+		return workflow.WatchStatus(name, os.Stderr, interval)
 	}
 	return workflow.Status(name, os.Stderr)
 }
