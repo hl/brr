@@ -96,11 +96,11 @@ func handleStageResult(opts Options, state *State, store store, stage Stage, res
 	switch result.Reason {
 	case engine.ReasonFailed:
 		fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow stopped — stage %q failed%s\n", ui.Bold, ui.Red, stage.ID, ui.Reset)
-		fmt.Fprintf(os.Stderr, "  %sDelete .brr-failed and re-run to resume.%s\n", ui.Dim, ui.Reset)
+		fmt.Fprintf(os.Stderr, "  %sRe-run to resume.%s\n", ui.Dim, ui.Reset)
 		return -1, true, nil
 	case engine.ReasonApproval:
 		fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow paused — stage %q needs approval%s\n", ui.Bold, ui.Yellow, stage.ID, ui.Reset)
-		fmt.Fprintf(os.Stderr, "  %sDelete .brr-needs-approval and re-run to resume.%s\n", ui.Dim, ui.Reset)
+		fmt.Fprintf(os.Stderr, "  %sResolve the issue and re-run to resume.%s\n", ui.Dim, ui.Reset)
 		return -1, true, nil
 	case engine.ReasonCycle:
 		return handleCycle(opts, state, store, stage, result)
