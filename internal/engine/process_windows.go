@@ -10,6 +10,10 @@ import (
 
 const createNewProcessGroup = 0x00000200
 
+var procGenerateConsoleCtrlEvent = modkernel32.NewProc("GenerateConsoleCtrlEvent")
+
+const ctrlBreakEvent = 1
+
 // setProcAttr configures the command to run in a new process group on Windows
 // so that console control events and tree kills target the child tree only.
 func setProcAttr(cmd *exec.Cmd) {
@@ -71,6 +75,17 @@ func reapGroup(cmd *exec.Cmd) {
 	killProcessTree(uint32(cmd.Process.Pid), false)
 }
 
+func sendConsoleBreak(pid uint32) error {
+	r1, _, errno := procGenerateConsoleCtrlEvent.Call(uintptr(ctrlBreakEvent), uintptr(pid))
+	if r1 != 0 {
+		return nil
+	}
+	if errno != syscall.Errno(0) {
+		return errno
+	}
+	return syscall.EINVAL
+}
+
 // killGroup sends a termination signal to the child process tree on Windows.
 func killGroup(cmd *exec.Cmd, sig syscall.Signal) error {
 	if cmd.Process == nil {
@@ -80,9 +95,10 @@ func killGroup(cmd *exec.Cmd, sig syscall.Signal) error {
 
 	switch sig {
 	case syscall.SIGINT:
-		// Attempt graceful shutdown by terminating children first, then parent
-		killProcessTree(pid, false)
-		return cmd.Process.Kill()
+		if err := sendConsoleBreak(pid); err != nil {
+			return cmd.Process.Kill()
+		}
+		return nil
 	default:
 		// Force kill the entire process tree including the parent
 		killProcessTree(pid, true)
