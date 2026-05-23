@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] "Cycle Therapy" - 2026-05-23
+
 ### Changed
 
 - Workflow cycle exhaustion now degrades gracefully: when a stage requests another cycle but `cycle.max` is already used, brr prints a warning, logs a `cycle_skipped` event, and advances to the next sequential stage instead of failing the workflow. This removes a stuck-state where re-running a workflow would loop on the same cycle-max error indefinitely.
