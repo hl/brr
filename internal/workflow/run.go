@@ -111,12 +111,24 @@ func handleStageResult(opts Options, state *State, store store, stage Stage, res
 }
 
 func handleCycle(opts Options, state *State, store store, stage Stage, result *engine.Result) (int, bool, error) {
-	nextIdx, err := nextCycleIndex(opts.Workflow, state.CycleCount)
-	if err != nil {
+	if opts.Workflow.Cycle == nil {
+		err := errors.New("requested a workflow cycle, but no cycle target is configured")
 		store.appendEvent(Event{RunID: state.RunID, Workflow: opts.Name, Time: time.Now().UTC(), Type: "workflow_error", StageID: stage.ID, Reason: "cycle", Message: err.Error()})
 		return -1, false, fmt.Errorf("stage %s: %w", stage.ID, err)
 	}
+	if state.CycleCount >= opts.Workflow.Cycle.Max {
+		state.UpdatedAt = time.Now().UTC()
+		store.save(state)
+		msg := fmt.Sprintf("cycle.max %d reached; advancing past %s", opts.Workflow.Cycle.Max, stage.ID)
+		store.appendEvent(Event{RunID: state.RunID, Workflow: opts.Name, Time: state.UpdatedAt, Type: "cycle_skipped", StageID: stage.ID, Reason: "cycle_max_reached", Message: msg})
+		fmt.Fprintf(os.Stderr, "\n  %s%sCycle limit reached%s %s— stage %q requested another cycle, but cycle.max %d was already used. Advancing without looping back.%s\n",
+			ui.Bold, ui.Yellow, ui.Reset,
+			ui.Dim, stage.ID, opts.Workflow.Cycle.Max, ui.Reset,
+		)
+		return -1, false, nil
+	}
 	state.CycleCount++
+	nextIdx := stageIndexByID(opts.Workflow, opts.Workflow.Cycle.Target)
 	state.NextStageID = opts.Workflow.Stages[nextIdx].ID
 	state.UpdatedAt = time.Now().UTC()
 	store.save(state)
@@ -229,16 +241,6 @@ func runCommandStage(stage Stage) (*engine.Result, error) {
 		return &engine.Result{Reason: engine.ReasonFailStreak}, err
 	}
 	return &engine.Result{Reason: engine.ReasonComplete}, nil
-}
-
-func nextCycleIndex(wf Workflow, currentCycles int) (int, error) {
-	if wf.Cycle == nil {
-		return -1, errors.New("requested a workflow cycle, but no cycle target is configured")
-	}
-	if currentCycles >= wf.Cycle.Max {
-		return -1, fmt.Errorf("requested another workflow cycle after cycle.max %d", wf.Cycle.Max)
-	}
-	return stageIndexByID(wf, wf.Cycle.Target), nil
 }
 
 func saveNextStage(wf Workflow, state *State, store store, stageIdx int) {

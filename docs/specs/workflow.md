@@ -31,7 +31,7 @@ The workflow command orchestrates versioned YAML pipelines. A workflow is a sequ
 23. On successful completion, the workflow state file is deleted. Event history remains.
 24. On error, approval pause, failure signal, or interrupt, the workflow state file is preserved so the next run can resume.
 25. If `.brr-cycle` is detected and `cycle` is configured with remaining cycles, the workflow increments `cycle_count` and restarts from `cycle.target`.
-26. If `.brr-cycle` is detected without a cycle config, or after `cycle.max` is reached, the workflow exits with an error.
+26. If `.brr-cycle` is detected without a cycle config, the workflow exits with an error. If `.brr-cycle` is detected after `cycle.max` is reached, the workflow logs a `cycle_skipped` event, prints a warning, and advances to the next sequential stage instead of looping back.
 27. Agent-reported `.brr-failed` and `.brr-needs-approval` stop the workflow with exit code 0 and preserve state.
 28. Command stage non-zero exits stop the workflow with exit code 1 and preserve state.
 29. Interrupts stop the workflow with exit code 130 and preserve state.
@@ -66,7 +66,8 @@ The workflow command orchestrates versioned YAML pipelines. A workflow is a sequ
 - [ ] Command stages run argv directly, inherit stdio, and stop the workflow on non-zero exit.
 - [ ] Agent stages use prompt resolution, profile resolution, effective max, and `SkipLock: true`.
 - [ ] `.brr-cycle` restarts from `cycle.target` until `cycle.max` is reached.
-- [ ] `.brr-cycle` errors when no cycle config exists or cycle max is reached.
+- [ ] `.brr-cycle` errors when no cycle config exists.
+- [ ] `.brr-cycle` advances past the current stage with a warning when `cycle.max` is already reached.
 - [ ] State is written to `.brr/state/workflows/<name>.json` and event logs to `.brr/state/workflows/<name>.events.jsonl`.
 - [ ] Successful completion deletes only the state file and preserves event history.
 - [ ] Failure, approval, error, and interrupt preserve state.

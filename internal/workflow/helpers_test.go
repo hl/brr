@@ -83,11 +83,11 @@ func cycleOnceCmd(counter string) []string {
 	return []string{"sh", "-c", `lines=$(wc -l < ` + shellQuote(counter) + ` | tr -d ' '); if [ "$lines" -lt 2 ]; then touch .brr-cycle; fi`}
 }
 
-func alwaysCycleCmd() []string {
+func alwaysCycleAndCountCmd(counter string) []string {
 	if runtime.GOOS == "windows" {
-		return []string{"cmd", "/c", "echo again > .brr-cycle"}
+		return []string{"cmd", "/c", "echo x >> " + counter + " & echo again > .brr-cycle"}
 	}
-	return []string{"sh", "-c", "touch .brr-cycle"}
+	return []string{"sh", "-c", "printf 'x\\n' >> " + shellQuote(counter) + " && touch .brr-cycle"}
 }
 
 func shellQuote(s string) string {

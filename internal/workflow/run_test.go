@@ -113,11 +113,15 @@ func TestRunCycleFromCommandStage(t *testing.T) {
 	}
 }
 
-func TestRunCycleLimit(t *testing.T) {
+func TestRunCycleLimitAdvancesPastStage(t *testing.T) {
 	t.Chdir(t.TempDir())
-	wf := testWorkflow([]Stage{{ID: "build", Type: StageTypeCommand, Command: alwaysCycleCmd()}}, &Cycle{Target: "build", Max: 1})
+	counter := filepath.Join(".", "counter")
+	wf := testWorkflow([]Stage{
+		{ID: "build", Type: StageTypeCommand, Command: alwaysCycleAndCountCmd(counter)},
+		{ID: "review", Type: StageTypeCommand, Command: appendTextCmd(counter, "review\n")},
+	}, &Cycle{Target: "build", Max: 1})
 
-	_, err := Run(Options{
+	result, err := Run(Options{
 		Name:     "ship",
 		Workflow: wf,
 		Config:   testConfig(echoCmd()),
@@ -125,15 +129,25 @@ func TestRunCycleLimit(t *testing.T) {
 			return name, nil
 		},
 	})
-	if err == nil {
-		t.Fatal("expected cycle max error")
+	if err != nil {
+		t.Fatalf("expected workflow to complete despite cycle.max, got error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "cycle.max 1") {
-		t.Fatalf("expected cycle max in error, got: %v", err)
+	if result == nil || result.Reason != engine.ReasonComplete {
+		t.Fatalf("expected complete result, got %#v", result)
 	}
-	state := readState(t, "ship")
-	if state.CycleCount != 1 {
-		t.Fatalf("expected cycle count 1, got %d", state.CycleCount)
+	data, err := os.ReadFile(counter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(string(data))
+	// max=1 → build runs initially, cycles back once, then on its 2nd cycle
+	// request the limit is reached and the workflow advances to review.
+	want := "x\nx\nreview"
+	if got != want {
+		t.Fatalf("expected counter %q, got %q", want, got)
+	}
+	if _, err := os.Stat(filepath.Join(StateDir, "ship.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected state file to be deleted on completion, got: %v", err)
 	}
 }
 
