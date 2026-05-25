@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] "Encore Performance" - 2026-05-25
+
 ### Added
 
 - `brr workflow reset <name>` discards a workflow's saved state and event log without starting a run. Use it to abandon a paused or failed run cleanly.
