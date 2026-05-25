@@ -330,8 +330,48 @@ func TestWorkflowRunIntegration(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected workflow run error: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(".brr", "state", "workflows", "ship.events.jsonl")); err != nil {
-		t.Fatalf("expected workflow events file: %v", err)
+	if _, err := os.Stat(filepath.Join(".brr", "state", "workflows", "ship.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected workflow state to be cleared on success, got: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(".brr", "state", "workflows", "ship.events.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("expected workflow events to be cleared on success, got: %v", err)
+	}
+}
+
+func newTestWorkflowResetCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "reset <name>",
+		Args:         cobra.ExactArgs(1),
+		RunE:         resetWorkflow,
+		SilenceUsage: true,
+	}
+	return cmd
+}
+
+func TestWorkflowResetIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(filepath.Join(".brr", "state", "workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(".brr", "state", "workflows", "ship.json")
+	eventsPath := filepath.Join(".brr", "state", "workflows", "ship.events.jsonl")
+	if err := os.WriteFile(statePath, []byte(`{"schema_version":2,"workflow":"ship","run_id":"abc","next_stage_id":"check"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(eventsPath, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newTestWorkflowResetCmd()
+	cmd.SetArgs([]string{"ship"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected reset error: %v", err)
+	}
+	if _, err := os.Stat(statePath); !os.IsNotExist(err) {
+		t.Fatalf("expected state to be removed, got: %v", err)
+	}
+	if _, err := os.Stat(eventsPath); !os.IsNotExist(err) {
+		t.Fatalf("expected events to be removed, got: %v", err)
 	}
 }
 

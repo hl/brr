@@ -57,6 +57,14 @@ var workflowInitCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var workflowResetCmd = &cobra.Command{
+	Use:          "reset <name>",
+	Short:        "Discard saved state and event log for a workflow",
+	Args:         cobra.ExactArgs(1),
+	RunE:         resetWorkflow,
+	SilenceUsage: true,
+}
+
 func init() {
 	workflowRunCmd.Flags().StringP("profile", "p", "", "default profile for agent stages")
 	workflowRunCmd.Flags().BoolP("notify", "n", false, "send a desktop notification when the workflow completes")
@@ -71,6 +79,7 @@ func init() {
 	workflowCmd.AddCommand(workflowValidateCmd)
 	workflowCmd.AddCommand(workflowStatusCmd)
 	workflowCmd.AddCommand(workflowInitCmd)
+	workflowCmd.AddCommand(workflowResetCmd)
 	rootCmd.AddCommand(workflowCmd)
 }
 
@@ -179,6 +188,20 @@ func statusWorkflow(cmd *cobra.Command, args []string) error {
 		return workflow.WatchStatus(name, os.Stderr, interval)
 	}
 	return workflow.Status(name, os.Stderr)
+}
+
+func resetWorkflow(cmd *cobra.Command, args []string) error {
+	name := args[0]
+	removed, err := workflow.Reset(name)
+	if err != nil {
+		return err
+	}
+	if removed {
+		fmt.Fprintf(os.Stderr, "  %s%sCleared%s saved state for workflow %q\n", ui.Bold, ui.Green, ui.Reset, name)
+	} else {
+		fmt.Fprintf(os.Stderr, "  %sno saved state for workflow %q%s\n", ui.Dim, name, ui.Reset)
+	}
+	return nil
 }
 
 func initWorkflow(cmd *cobra.Command, args []string) error {

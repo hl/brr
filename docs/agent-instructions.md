@@ -107,6 +107,7 @@ Workflow guidelines:
 - Set `cycle.target` to the first stage that should rerun when verification or review finds more work.
 - Keep workflow stage IDs short and stable because state files store `next_stage_id`.
 - Run `brr workflow validate <name>` before `brr workflow run <name>`.
+- A successful run clears both `.brr/state/workflows/<name>.json` and `<name>.events.jsonl`, so the next `brr workflow run <name>` starts fresh without `--reset`. Use `brr workflow reset <name>` to discard a paused or failed run without starting a new one.
 
 ## Common Commands
 
@@ -118,6 +119,7 @@ brr workflow validate ship
 brr workflow run ship --notify
 brr workflow status ship
 brr workflow run ship --reset
+brr workflow reset ship
 ```
 
 ## When to Ask for Approval

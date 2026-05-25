@@ -57,8 +57,8 @@ func Run(opts Options) (*engine.Result, error) {
 		saveNextStage(opts.Workflow, state, store, stageIdx)
 	}
 
-	store.delete()
 	store.appendEvent(Event{RunID: state.RunID, Workflow: opts.Name, Time: time.Now().UTC(), Type: "workflow_complete"})
+	store.deleteAll()
 	fmt.Fprintf(os.Stderr, "\n  %s%sWorkflow complete%s\n", ui.Bold, ui.Green, ui.Reset)
 	if opts.Notify != nil {
 		opts.Notify()
@@ -79,17 +79,21 @@ func initialRunState(opts Options, store store) (int, *State) {
 		Stages:        initialStageStatus(opts.Workflow),
 	}
 
-	if opts.Reset {
-		return 0, state
-	}
-	if saved, err := store.load(); err == nil && validResumeState(saved, opts.Workflow, opts.Name) {
-		fmt.Fprintf(os.Stderr, "  %sresuming:%s stage %s", ui.Dim, ui.Reset, saved.NextStageID)
-		if saved.CycleCount > 0 {
-			fmt.Fprintf(os.Stderr, " (cycle %d)", saved.CycleCount)
+	if !opts.Reset {
+		if saved, err := store.load(); err == nil && validResumeState(saved, opts.Workflow, opts.Name) {
+			fmt.Fprintf(os.Stderr, "  %sresuming:%s stage %s", ui.Dim, ui.Reset, saved.NextStageID)
+			if saved.CycleCount > 0 {
+				fmt.Fprintf(os.Stderr, " (cycle %d)", saved.CycleCount)
+			}
+			fmt.Fprintln(os.Stderr)
+			return stageIndexByID(opts.Workflow, saved.NextStageID), saved
 		}
-		fmt.Fprintln(os.Stderr)
-		return stageIndexByID(opts.Workflow, saved.NextStageID), saved
 	}
+	detail := "no saved state"
+	if opts.Reset {
+		detail = "discarded saved state"
+	}
+	fmt.Fprintf(os.Stderr, "  %sstarting fresh:%s %s\n", ui.Dim, ui.Reset, detail)
 	return 0, state
 }
 

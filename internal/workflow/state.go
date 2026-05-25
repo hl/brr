@@ -57,6 +57,30 @@ func (s store) delete() {
 	removeStatePath(s.statePath())
 }
 
+func (s store) deleteAll() {
+	removeStatePath(s.statePath())
+	removeStatePath(s.eventsPath())
+}
+
+// Reset discards the saved state and event log for the named workflow.
+// It reports whether any files were removed so callers can distinguish a
+// no-op from an actual cleanup.
+func Reset(name string) (bool, error) {
+	if err := validateName(name); err != nil {
+		return false, err
+	}
+	s := store{name: name}
+	hadState := pathExists(s.statePath())
+	hadEvents := pathExists(s.eventsPath())
+	s.deleteAll()
+	return hadState || hadEvents, nil
+}
+
+func pathExists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
 func (s store) appendEvent(event Event) {
 	if err := ensureStateDir(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not create workflow event dir: %v\n", err)

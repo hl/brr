@@ -52,8 +52,8 @@ func TestRunSequentialAgentAndCommandStages(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(StateDir, "ship.json")); !os.IsNotExist(err) {
 		t.Fatalf("expected state file to be deleted on completion, got: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(StateDir, "ship.events.jsonl")); err != nil {
-		t.Fatalf("expected event log to remain: %v", err)
+	if _, err := os.Stat(filepath.Join(StateDir, "ship.events.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("expected event log to be deleted on completion, got: %v", err)
 	}
 }
 
@@ -148,6 +148,26 @@ func TestRunCycleLimitAdvancesPastStage(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(StateDir, "ship.json")); !os.IsNotExist(err) {
 		t.Fatalf("expected state file to be deleted on completion, got: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(StateDir, "ship.events.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("expected event log to be deleted on completion, got: %v", err)
+	}
+}
+
+func TestRunCommandStageFailurePreservesEvents(t *testing.T) {
+	t.Chdir(t.TempDir())
+	wf := testWorkflow([]Stage{{ID: "check", Type: StageTypeCommand, Command: failCmd()}}, nil)
+
+	_, _ = Run(Options{
+		Name:     "ship",
+		Workflow: wf,
+		Config:   testConfig(echoCmd()),
+		ResolvePrompt: func(name string) (string, error) {
+			return name, nil
+		},
+	})
+	if _, err := os.Stat(filepath.Join(StateDir, "ship.events.jsonl")); err != nil {
+		t.Fatalf("expected event log to remain after failure: %v", err)
 	}
 }
 

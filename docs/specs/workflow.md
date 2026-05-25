@@ -10,6 +10,7 @@ The workflow command orchestrates versioned YAML pipelines. A workflow is a sequ
 2. Workflow validation is invoked with `brr workflow validate <name> [flags]`.
 3. Workflow status is invoked with `brr workflow status [name]`; `--watch` redraws a named workflow's saved state until the state file is cleared.
 4. Workflow template creation is invoked with `brr workflow init <name> --template ship`.
+4a. Workflow state discard is invoked with `brr workflow reset <name>`, which deletes the saved state file and event log for the named workflow. The command is a no-op when no saved state exists.
 5. Workflow files are YAML. Resolution searches `.brr/workflows/<name>.yaml`, then `<user-config-dir>/brr/workflows/<name>.yaml`. The first match wins.
 6. Workflow names must be non-empty and must not include path separators or `..`.
 7. Workflow files must use schema `version: 2`. Unversioned or older workflow files are rejected with a clear migration-style error.
@@ -27,9 +28,9 @@ The workflow command orchestrates versioned YAML pipelines. A workflow is a sequ
 19. After every stage, the workflow records state in `.brr/state/workflows/<name>.json` and appends an event to `.brr/state/workflows/<name>.events.jsonl`.
 20. The state file contains `schema_version`, `workflow`, `run_id`, `started_at`, `updated_at`, `start_sha`, `next_stage_id`, `cycle_count`, and per-stage status entries with status, reason, duration, prompt/profile/command metadata.
 21. On startup, if the state file is valid for the current workflow, the run resumes from `next_stage_id`. Invalid state is ignored and a fresh run starts.
-22. `--reset` deletes the workflow state file before starting. Event history is preserved.
-23. On successful completion, the workflow state file is deleted. Event history remains.
-24. On error, approval pause, failure signal, or interrupt, the workflow state file is preserved so the next run can resume.
+22. `--reset` deletes the workflow state file before starting. Event history is preserved so the prior run can be inspected.
+23. On successful completion, both the workflow state file and the event log are deleted so the next `brr workflow run <name>` starts fresh without `--reset`.
+24. On error, approval pause, failure signal, or interrupt, both the workflow state file and the event log are preserved so the next run can resume and the failure can be inspected.
 25. If `.brr-cycle` is detected and `cycle` is configured with remaining cycles, the workflow increments `cycle_count` and restarts from `cycle.target`.
 26. If `.brr-cycle` is detected without a cycle config, the workflow exits with an error. If `.brr-cycle` is detected after `cycle.max` is reached, the workflow logs a `cycle_skipped` event, prints a warning, and advances to the next sequential stage instead of looping back.
 27. Agent-reported `.brr-failed` and `.brr-needs-approval` stop the workflow with exit code 0 and preserve state.
@@ -69,10 +70,11 @@ The workflow command orchestrates versioned YAML pipelines. A workflow is a sequ
 - [ ] `.brr-cycle` errors when no cycle config exists.
 - [ ] `.brr-cycle` advances past the current stage with a warning when `cycle.max` is already reached.
 - [ ] State is written to `.brr/state/workflows/<name>.json` and event logs to `.brr/state/workflows/<name>.events.jsonl`.
-- [ ] Successful completion deletes only the state file and preserves event history.
-- [ ] Failure, approval, error, and interrupt preserve state.
+- [ ] Successful completion deletes both the state file and the event log.
+- [ ] Failure, approval, error, and interrupt preserve both the state file and the event log.
 - [ ] Resume starts from the saved `next_stage_id`.
-- [ ] `--reset` discards saved state and starts from the first stage.
+- [ ] `--reset` discards saved state and starts from the first stage; event history is preserved.
+- [ ] `brr workflow reset <name>` discards both the state file and the event log; it prints a no-op message when no saved state exists.
 - [ ] `brr workflow status [name]` prints saved state as a readable stage-by-stage view or a clear no-state message.
 - [ ] `brr workflow status <name> --watch` redraws saved state with a running-stage animation.
 - [ ] `brr workflow init <name> --template ship` creates a valid V2 workflow file.

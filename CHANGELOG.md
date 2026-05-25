@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `brr workflow reset <name>` discards a workflow's saved state and event log without starting a run. Use it to abandon a paused or failed run cleanly.
+- `brr workflow run` now prints a `starting fresh: no saved state` line when no resume state applies, mirroring the existing `resuming:` line. Makes the lifecycle visible so users don't reach for `--reset` after a successful run.
+
+### Changed
+
+- Successful workflow completion now clears both `.brr/state/workflows/<name>.json` and `.brr/state/workflows/<name>.events.jsonl`. Previously the event log was preserved across runs. Pause, failure, error, and interrupt still preserve both files for resume and inspection.
+
 ## [0.5.0] "Cycle Therapy" - 2026-05-23
 
 ### Changed

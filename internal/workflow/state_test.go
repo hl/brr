@@ -169,6 +169,54 @@ func TestStateWriteRejectsSymlink(t *testing.T) {
 	}
 }
 
+func TestResetClearsStateAndEvents(t *testing.T) {
+	t.Chdir(t.TempDir())
+	s := store{name: "ship"}
+	s.save(&State{
+		SchemaVersion: SchemaVersion,
+		Workflow:      "ship",
+		RunID:         "abc",
+		StartedAt:     testTime(),
+		UpdatedAt:     testTime(),
+		NextStageID:   "build",
+	})
+	s.appendEvent(Event{RunID: "abc", Workflow: "ship", Time: testTime(), Type: "stage_started", StageID: "build"})
+
+	removed, err := Reset("ship")
+	if err != nil {
+		t.Fatalf("Reset error: %v", err)
+	}
+	if !removed {
+		t.Fatal("expected Reset to report files removed")
+	}
+	if _, err := os.Stat(filepath.Join(StateDir, "ship.json")); !os.IsNotExist(err) {
+		t.Fatalf("state file not removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(StateDir, "ship.events.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("events file not removed: %v", err)
+	}
+}
+
+func TestResetNoStateReportsNotRemoved(t *testing.T) {
+	t.Chdir(t.TempDir())
+	removed, err := Reset("ship")
+	if err != nil {
+		t.Fatalf("Reset error: %v", err)
+	}
+	if removed {
+		t.Fatal("expected Reset to report nothing removed when no state exists")
+	}
+}
+
+func TestResetRejectsInvalidName(t *testing.T) {
+	if _, err := Reset(""); err == nil {
+		t.Fatal("expected empty name to be rejected")
+	}
+	if _, err := Reset("a/b"); err == nil {
+		t.Fatal("expected path separator to be rejected")
+	}
+}
+
 func TestEventWriteRejectsSymlink(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.MkdirAll(StateDir, 0o755); err != nil {
