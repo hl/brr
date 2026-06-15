@@ -39,7 +39,7 @@ make fmt            # check formatting (fix with: make fmt-fix)
 
 ## Conventions
 
-- Go 1.26.1 (managed via mise)
+- Go 1.26.4 (managed via mise)
 - Use `cobra` for CLI, `viper` for config
 - All Go commands via `mise exec --` or the Makefile
 - Shared constants (colors, signal files) live in `internal/ui`
