@@ -123,6 +123,16 @@ cycle:
   max: 3
 
 stages:
+  - id: spec
+    type: agent
+    prompt: spec
+    max: 3
+
+  - id: plan
+    type: agent
+    prompt: plan
+    max: 5
+
   - id: build
     type: agent
     prompt: build
@@ -131,6 +141,16 @@ stages:
   - id: check
     type: command
     command: ["make", "check"]
+
+  - id: verify
+    type: agent
+    prompt: verify
+    max: 3
+
+  - id: review
+    type: agent
+    prompt: review
+    max: 1
 ```
 
 Run workflows with `brr workflow run <name>`, which prints the stage flow and current state as the run advances. Use `brr workflow validate <name>` before a long run, `brr workflow status [name]` to inspect saved progress, `brr workflow status <name> --watch` to follow the saved state live, `brr workflow reset <name>` to discard saved progress without starting a run, and `brr workflow init <name> --template ship` to copy the bundled requirements-to-review workflow.
