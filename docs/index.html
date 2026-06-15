@@ -82,6 +82,7 @@ brr workflow run &lt;name&gt; [flags]
 brr workflow validate &lt;name&gt;
 brr workflow status [name]
 brr workflow init &lt;name&gt;
+brr workflow reset &lt;name&gt;
 brr [command]</code></pre>
               </div>
               <div class="help-panel">
@@ -210,6 +211,16 @@ cycle:
   max: 3
 
 stages:
+  - id: spec
+    type: agent
+    prompt: spec
+    max: 3
+
+  - id: plan
+    type: agent
+    prompt: plan
+    max: 5
+
   - id: build
     type: agent
     prompt: build
@@ -217,7 +228,17 @@ stages:
 
   - id: check
     type: command
-    command: ["make", "check"]</code></pre>
+    command: ["make", "check"]
+
+  - id: verify
+    type: agent
+    prompt: verify
+    max: 3
+
+  - id: review
+    type: agent
+    prompt: review
+    max: 1</code></pre>
             </div>
           </section>
 
@@ -269,7 +290,7 @@ stages:
                 <p>
                   Tracks workflow progress for resume and JSONL event history, including stage status,
                   cycle count, and starting git SHA. Written by <code>brr workflow run</code>.
-                  State files are deleted on completion; event logs remain for debugging. Use <code>--reset</code> to discard saved state.
+                  Both the state file and event log are cleared on successful completion, and preserved on pause, failure, or interrupt for resume and inspection. Use <code>brr workflow reset</code> (or <code>--reset</code>) to discard saved state.
                   Added to .gitignore by <code>brr init</code>.
                 </p>
               </div>
