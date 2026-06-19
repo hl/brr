@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>brr | How the workflow works</title>
+    <meta
+      name="description"
+      content="How the brr workflow works: versioned YAML pipelines that chain agent stages with deterministic command gates, with cycle-back loops, signal files, and resumable state."
+    >
+    <style>
+      :root {
+        --bg: #07111c;
+        --panel: rgba(8, 14, 22, 0.92);
+        --line: rgba(132, 162, 191, 0.2);
+        --line-strong: rgba(132, 162, 191, 0.34);
+        --text: #eff5fb;
+        --muted: #9eabb8;
+        --cyan: #53d6ff;
+        --blue: #5f7cff;
+        --magenta: #d05cff;
+        --red: #ff6767;
+        --yellow: #ffcd57;
+        --green: #6ae581;
+        --orange: #ff9b43;
+        --shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+        --mono: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", "Menlo", monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: var(--mono);
+        background:
+          radial-gradient(circle at top left, rgba(83, 214, 255, 0.14), transparent 30%),
+          radial-gradient(circle at top right, rgba(208, 92, 255, 0.12), transparent 26%),
+          linear-gradient(180deg, #06101a 0%, #09131f 48%, #07111c 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 28px 28px;
+        opacity: 0.34;
+      }
+
+      a { color: var(--cyan); text-decoration: none; }
+      a:hover, a:focus-visible { color: var(--text); }
+
+      .page-shell {
+        width: min(1100px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 18px 0 36px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 10px 4px 18px;
+      }
+
+      .wordmark {
+        color: var(--text);
+        text-transform: lowercase;
+        letter-spacing: 0.16em;
+        font-weight: 700;
+      }
+
+      .nav-links { display: flex; flex-wrap: wrap; gap: 16px; }
+      .nav-links a { color: var(--muted); }
+      .nav-links a:hover { color: var(--text); }
+
+      .terminal-shell {
+        width: 100%;
+        border: 1px solid var(--line-strong);
+        border-radius: 24px;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(9, 16, 25, 0.98), rgba(6, 12, 19, 0.96));
+        box-shadow: var(--shadow);
+      }
+
+      .terminal-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 52px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+      }
+
+      .dot { width: 12px; height: 12px; border-radius: 50%; }
+      .dot-red { background: var(--red); }
+      .dot-yellow { background: var(--yellow); }
+      .dot-green { background: var(--green); }
+      .terminal-label { margin-left: 8px; color: var(--muted); font-size: 0.92rem; }
+
+      .terminal-body { padding: 22px; }
+
+      .block {
+        padding: 22px 0 26px;
+        border-bottom: 1px solid var(--line);
+      }
+      .block:last-child { border-bottom: 0; }
+
+      .section-kicker { color: var(--muted); margin: 0 0 16px; }
+      h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 14px 0 0; letter-spacing: 0.02em; }
+      h2 { font-size: 1.1rem; margin: 0 0 6px; }
+      p { line-height: 1.7; margin: 0 0 12px; }
+      .lead { max-width: 90ch; color: var(--text); }
+      .muted { color: var(--muted); }
+
+      code { font-family: inherit; }
+      :not(pre) > code {
+        color: var(--cyan);
+        background: rgba(83, 214, 255, 0.08);
+        padding: 1px 6px;
+        border-radius: 6px;
+      }
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        line-height: 1.7;
+        white-space: pre;
+      }
+
+      /* ---- pipeline diagram ---- */
+      .pipeline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 8px;
+        padding: 20px 16px 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
+      }
+      .node {
+        flex: 1 1 120px;
+        min-width: 120px;
+        border-radius: 12px;
+        padding: 12px 12px 14px;
+        border: 1px solid var(--line-strong);
+        background: rgba(8, 14, 22, 0.6);
+        position: relative;
+      }
+      .node .tag {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+      .node .id { font-size: 1.05rem; font-weight: 700; margin: 6px 0 2px; }
+      .node .meta { font-size: 0.78rem; color: var(--muted); }
+      .node.agent { border-color: rgba(83, 214, 255, 0.5); }
+      .node.agent .id { color: var(--cyan); }
+      .node.command { border-color: rgba(255, 155, 67, 0.5); }
+      .node.command .id { color: var(--orange); }
+      .arrow { align-self: center; color: var(--muted); font-size: 1.1rem; flex: 0 0 auto; }
+
+      .cycle-bar {
+        margin-top: 14px;
+        padding: 12px 16px;
+        border: 1px dashed rgba(208, 92, 255, 0.5);
+        border-radius: 12px;
+        background: rgba(208, 92, 255, 0.06);
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .cycle-bar .badge { color: var(--magenta); font-weight: 700; white-space: nowrap; }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 22px;
+        margin-top: 16px;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+      .legend span b { font-family: var(--mono); }
+      .ic { display: inline-block; width: 1.3em; text-align: center; }
+      .ic.green { color: var(--green); }
+      .ic.cyan { color: var(--cyan); }
+      .ic.red { color: var(--red); }
+      .ic.yellow { color: var(--yellow); }
+      .ic.magenta { color: var(--magenta); }
+      .ic.dim { color: var(--muted); }
+
+      /* ---- two-column layout ---- */
+      .split {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.25fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .card {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
+      }
+      .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+      /* ---- tables ---- */
+      table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; }
+      td code { white-space: nowrap; }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      tr:last-child td { border-bottom: 0; }
+
+      .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; }
+      .pill.zero { color: var(--green); border: 1px solid rgba(106, 229, 129, 0.4); }
+      .pill.one { color: var(--red); border: 1px solid rgba(255, 103, 103, 0.4); }
+      .pill.k130 { color: var(--yellow); border: 1px solid rgba(255, 205, 87, 0.4); }
+      .pill.none { color: var(--muted); border: 1px solid var(--line); }
+
+      ol.steps { margin: 0; padding-left: 1.3em; }
+      ol.steps li { margin-bottom: 10px; line-height: 1.6; }
+
+      .footer { padding: 18px 4px 0; color: var(--muted); font-size: 0.92rem; }
+
+      @media (max-width: 860px) {
+        .split, .grid-2 { grid-template-columns: 1fr; }
+        .arrow { display: none; }
+        .node { flex-basis: calc(50% - 8px); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="wordmark" href="./index.html">brr</a>
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#model">Model</a>
+          <a href="#file">File</a>
+          <a href="#stages">Stages</a>
+          <a href="#outcomes">Outcomes</a>
+          <a href="#state">State</a>
+          <a href="#cli">CLI</a>
+        </nav>
+      </header>
+
+      <main class="terminal-shell">
+        <div class="terminal-bar" aria-hidden="true">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+          <span class="terminal-label">brr workflow run ship</span>
+        </div>
+
+        <div class="terminal-body">
+          <!-- intro -->
+          <section class="block" id="model">
+            <p class="section-kicker">$ how the brr workflow works</p>
+            <h1>Agent stages and command gates, chained into one resumable pipeline</h1>
+            <p class="lead" style="margin-top:14px;">
+              A <strong>workflow</strong> is a versioned YAML pipeline that runs a list of named
+              <em>stages</em> in order. <strong>Agent stages</strong> run the brr loop engine with a
+              prompt; <strong>command stages</strong> run a deterministic check — tests, a linter, a
+              build. The agent proposes, the gates validate, and a <em>cycle-back</em> loop sends the
+              pipeline to an earlier stage when later work finds more to do. Progress is saved after
+              every stage, so an interrupted run resumes exactly where it stopped.
+            </p>
+            <p class="muted" style="margin-bottom:0;">
+              The workflow itself is deliberately dumb: it sequences stages, watches for signal files,
+              and records state. All the judgment lives in the prompts the agent stages run.
+            </p>
+          </section>
+
+          <!-- pipeline diagram -->
+          <section class="block">
+            <p class="section-kicker">$ the bundled "ship" pipeline</p>
+            <p class="muted" style="margin-top:-4px;">requirements → verified, reviewed code</p>
+
+            <div class="pipeline">
+              <div class="node agent">
+                <div class="tag">agent</div>
+                <div class="id">spec</div>
+                <div class="meta">prompt: spec · max 3</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node agent">
+                <div class="tag">agent</div>
+                <div class="id">plan</div>
+                <div class="meta">prompt: plan · max 5</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node agent">
+                <div class="tag">agent</div>
+                <div class="id">build</div>
+                <div class="meta">prompt: build · max 100</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node command">
+                <div class="tag">command</div>
+                <div class="id">check</div>
+                <div class="meta">make check</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node agent">
+                <div class="tag">agent</div>
+                <div class="id">verify</div>
+                <div class="meta">prompt: verify · max 3</div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node agent">
+                <div class="tag">agent</div>
+                <div class="id">review</div>
+                <div class="meta">prompt: review · max 1</div>
+              </div>
+            </div>
+
+            <div class="cycle-bar">
+              <span class="badge">↺ cycle</span>
+              <span>
+                If <code>check</code>, <code>verify</code>, or <code>review</code> drops
+                <code>.brr-cycle</code>, the run jumps back to <code>cycle.target</code>
+                (<strong>build</strong>) — up to <code>cycle.max</code> (<strong>3</strong>) times,
+                then advances with a warning.
+              </span>
+            </div>
+
+            <div class="legend" aria-label="status icons">
+              <span><span class="ic dim">○</span> pending</span>
+              <span><span class="ic cyan">▶</span> running</span>
+              <span><span class="ic green">✓</span> completed</span>
+              <span><span class="ic red">✗</span> failed / error</span>
+              <span><span class="ic yellow">⏸</span> approval</span>
+              <span><span class="ic magenta">↻</span> cycled</span>
+              <span><span class="ic yellow">■</span> interrupted</span>
+            </div>
+          </section>
+
+          <!-- file anatomy -->
+          <section class="block" id="file">
+            <p class="section-kicker">$ cat .brr/workflows/ship.yaml</p>
+            <div class="split">
+              <div class="card">
+                <h2>Anatomy</h2>
+                <p class="muted">
+                  Workflow files are YAML, resolved <code>.brr/workflows/&lt;name&gt;.yaml</code> first,
+                  then the user config dir. Only <code>version: 2</code> is accepted — older files are
+                  rejected with a migration error.
+                </p>
+                <p class="muted">
+                  <strong>defaults</strong> set the fallback profile and iteration cap for agent
+                  stages. <strong>cycle</strong> is optional — omit it for a straight line.
+                  <strong>stages</strong> run top to bottom.
+                </p>
+                <p class="muted" style="margin-bottom:0;">
+                  Profile resolves: stage → <code>--profile</code> → <code>defaults.profile</code> →
+                  config default. A profile maps to a <code>command</code> + <code>args</code> in
+                  <code>.brr.yaml</code>.
+                </p>
+              </div>
+              <div class="card">
+<pre><code>version: 2
+description: "requirements -> verified, reviewed code"
+
+defaults:
+  profile: claude     # fallback profile for agent stages
+  max: 3              # fallback iteration cap
+
+cycle:
+  target: build       # jump here on .brr-cycle
+  max: 3              # bound the loop
+
+stages:
+  - id: spec          # unique id, no / \ ..
+    type: agent       # agent | command
+    prompt: spec       # file > named prompt > inline
+    max: 3            # per-stage cap (overrides default)
+
+  - id: check
+    type: command
+    command: ["make", "check"]   # argv, no shell
+
+  - id: review
+    type: agent
+    prompt: review
+    max: 1</code></pre>
+              </div>
+            </div>
+          </section>
+
+          <!-- stage types -->
+          <section class="block" id="stages">
+            <p class="section-kicker">$ two kinds of stage</p>
+            <div class="grid-2">
+              <div class="card">
+                <h2 style="color:var(--cyan);">agent stage</h2>
+                <p class="muted">
+                  Runs the brr loop engine: the resolved prompt is piped to the profile's command once
+                  per iteration, each iteration in a fresh process with a clean context. It loops until
+                  a signal file appears, <code>max</code> iterations is reached, or three consecutive
+                  failures occur.
+                </p>
+                <p class="muted" style="margin-bottom:0;">
+                  Requires <code>prompt</code>; may set <code>profile</code> and <code>max</code>.
+                  Runs with <code>SkipLock</code> — the workflow already holds the exclusive lock.
+                </p>
+              </div>
+              <div class="card">
+                <h2 style="color:var(--orange);">command stage</h2>
+                <p class="muted">
+                  Runs an argv array directly — no shell, no expansion — inheriting stdin, stdout, and
+                  stderr. These are the deterministic gates: <code>make check</code>, a test runner, a
+                  linter.
+                </p>
+                <p class="muted" style="margin-bottom:0;">
+                  Requires <code>command</code>; rejects <code>prompt</code>, <code>profile</code>, and
+                  <code>max</code>. A non-zero exit stops the whole workflow.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- outcomes -->
+          <section class="block" id="outcomes">
+            <p class="section-kicker">$ how a stage's outcome steers the run</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Stage outcome</th><th>What the workflow does</th><th>Exit</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>completes / <code>.brr-complete</code></td>
+                    <td>Advance to the next stage</td>
+                    <td><span class="pill none">—</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>.brr-cycle</code>, cycles remain</td>
+                    <td>Increment <code>cycle_count</code>, jump to <code>cycle.target</code></td>
+                    <td><span class="pill none">—</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>.brr-cycle</code>, <code>cycle.max</code> reached</td>
+                    <td>Log <code>cycle_skipped</code>, warn, advance past this stage</td>
+                    <td><span class="pill none">—</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>.brr-cycle</code>, no cycle configured</td>
+                    <td>Stop with an error</td>
+                    <td><span class="pill one">1</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>.brr-failed</code></td>
+                    <td>Stop, preserve state, print contents (≤ 4 KiB)</td>
+                    <td><span class="pill zero">0</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>.brr-needs-approval</code></td>
+                    <td>Pause, preserve state, print contents (≤ 4 KiB)</td>
+                    <td><span class="pill zero">0</span></td>
+                  </tr>
+                  <tr>
+                    <td>command stage non-zero exit</td>
+                    <td>Stop, preserve state</td>
+                    <td><span class="pill one">1</span></td>
+                  </tr>
+                  <tr>
+                    <td>interrupt (Ctrl-C)</td>
+                    <td>Stop, preserve state</td>
+                    <td><span class="pill k130">130</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="muted" style="margin:14px 0 0;">
+              Signal files (<code>.brr-complete</code>, <code>.brr-failed</code>,
+              <code>.brr-needs-approval</code>, <code>.brr-cycle</code>) are detected and removed
+              automatically after each stage.
+            </p>
+          </section>
+
+          <!-- lifecycle + state -->
+          <section class="block" id="state">
+            <p class="section-kicker">$ lifecycle &amp; resumable state</p>
+            <div class="split">
+              <div class="card">
+                <h2>Per-stage loop</h2>
+                <ol class="steps">
+                  <li>Resolve prompt + profile (agent) or read argv (command).</li>
+                  <li>Run the stage to completion.</li>
+                  <li>Write <code>&lt;name&gt;.json</code> and append one line to <code>&lt;name&gt;.events.jsonl</code>.</li>
+                  <li>Decide what's next from how the stage ended.</li>
+                </ol>
+                <p class="muted" style="margin:12px 0 0;">
+                  The exclusive lock is acquired once before the first stage and held until the
+                  workflow exits.
+                </p>
+              </div>
+              <div class="card">
+                <h2>State under <code>.brr/state/workflows/</code></h2>
+                <p class="muted">
+                  <code>&lt;name&gt;.json</code> holds <code>run_id</code>, <code>start_sha</code>,
+                  <code>next_stage_id</code>, <code>cycle_count</code>, and per-stage status.
+                  <code>&lt;name&gt;.events.jsonl</code> is an append-only event log.
+                </p>
+                <p class="muted">
+                  <strong>Resume:</strong> a valid state file resumes from <code>next_stage_id</code>;
+                  invalid state is ignored and the run starts fresh.
+                </p>
+                <p class="muted" style="margin-bottom:0;">
+                  <strong>Follow-up runs are frictionless:</strong> success deletes both files, so the
+                  next run starts clean with no <code>--reset</code>. Pause, failure, error, or
+                  interrupt preserves both for resume and inspection.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- CLI -->
+          <section class="block" id="cli">
+            <p class="section-kicker">$ brr workflow --help</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><code>workflow run &lt;name&gt;</code></td>
+                    <td>Run (or resume) the workflow. Flags: <code>--profile</code>, <code>--notify</code>, <code>--reset</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>workflow validate &lt;name&gt;</code></td>
+                    <td>Check schema, profiles, prompts, and command executables — without running anything.</td>
+                  </tr>
+                  <tr>
+                    <td><code>workflow status [name]</code></td>
+                    <td>Print saved state as a stage-by-stage view. <code>--watch</code> redraws live.</td>
+                  </tr>
+                  <tr>
+                    <td><code>workflow init &lt;name&gt;</code></td>
+                    <td>Create <code>.brr/workflows/&lt;name&gt;.yaml</code> from a template (<code>--template ship</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>workflow reset &lt;name&gt;</code></td>
+                    <td>Delete the saved state file and event log. No-op if none exist.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card" style="margin-top:16px;">
+<pre><code>brr workflow init ship          <span class="muted"># write .brr/workflows/ship.yaml</span>
+brr workflow validate ship      <span class="muted"># schema, profiles, prompts, commands</span>
+brr workflow run ship           <span class="muted"># run the pipeline, live flow shown</span>
+brr workflow status ship --watch <span class="muted"># follow a long run live</span></code></pre>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <p>
+          brr — your AI agent, but unhinged.
+          See the <a href="./specs/workflow.md">workflow spec</a> and the
+          <a href="https://github.com/hl/brr">repository</a>.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>
