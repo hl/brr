@@ -424,6 +424,7 @@ func TestCheckSignalFilesComplete(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil when .brr-complete exists")
+		return
 	}
 	if sig.reason != ReasonComplete {
 		t.Errorf("expected ReasonComplete, got %d", sig.reason)
@@ -440,6 +441,7 @@ func TestCheckSignalFilesFailed(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil when .brr-failed exists")
+		return
 	}
 	if sig.reason != ReasonFailed {
 		t.Errorf("expected ReasonFailed, got %d", sig.reason)
@@ -463,6 +465,7 @@ func TestCheckSignalFilesFailedPriorityOverApproval(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil")
+		return
 	}
 	if sig.reason != ReasonFailed {
 		t.Errorf("expected ReasonFailed (higher priority), got %d", sig.reason)
@@ -482,6 +485,7 @@ func TestCheckSignalFilesCompletePriorityOverFailed(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil")
+		return
 	}
 	if sig.reason != ReasonComplete {
 		t.Errorf("expected ReasonComplete (highest priority), got %d", sig.reason)
@@ -498,6 +502,7 @@ func TestCheckSignalFilesNeedsApproval(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil when .brr-needs-approval exists")
+		return
 	}
 	if sig.reason != ReasonApproval {
 		t.Errorf("expected ReasonApproval, got %d", sig.reason)
@@ -517,6 +522,7 @@ func TestCheckSignalFilesCycle(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil when .brr-cycle exists")
+		return
 	}
 	if sig.reason != ReasonCycle {
 		t.Errorf("expected ReasonCycle, got %d", sig.reason)
@@ -569,6 +575,7 @@ func TestCheckSignalFilesNeedsApprovalUnreadable(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil when .brr-needs-approval exists but is unreadable")
+		return
 	}
 	if sig.reason != ReasonApproval {
 		t.Errorf("expected ReasonApproval, got %d", sig.reason)
@@ -592,6 +599,7 @@ func TestCheckSignalFilesFailedUnreadable(t *testing.T) {
 	sig := checkSignalFiles()
 	if sig == nil {
 		t.Fatal("expected non-nil when .brr-failed exists but is unreadable")
+		return
 	}
 	if sig.reason != ReasonFailed {
 		t.Errorf("expected ReasonFailed, got %d", sig.reason)
