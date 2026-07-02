@@ -282,6 +282,7 @@ func Run(opts Options) (*Result, error) {
 			}
 		} else {
 			failStreak = 0
+			lastErr = nil
 		}
 
 		// i counts total attempts, including failures

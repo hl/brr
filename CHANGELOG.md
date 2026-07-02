@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `brr run` with `--max` no longer exits as a failure when an earlier iteration failed but the final iteration succeeded. The engine now clears the tracked last error on a successful iteration, so the "last iteration failed" error is only returned when the final iteration actually fails. This also prevents workflow stages from aborting with status "error" after a successful recovery.
+
 ## [0.6.0] "Encore Performance" - 2026-05-25
 
 ### Added
