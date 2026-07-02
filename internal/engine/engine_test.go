@@ -350,13 +350,14 @@ func TestRunMaxIterationsWithFailure(t *testing.T) {
 func TestRunMaxIterationsLastSucceeds(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	// Command that fails on first call, succeeds on second (uses counter file)
+	// Command that fails on first call, succeeds on second (uses counter file):
+	// exit 1 (creating the file) when it's absent, exit 0 once it exists.
 	counter := filepath.Join(".", "attempt")
 	var cmd []string
 	if runtime.GOOS == "windows" {
-		cmd = []string{"cmd", "/c", "echo x >> " + counter + " & exit 0"}
+		cmd = []string{"cmd", "/c", "if exist " + counter + " (exit 0) else (echo x > " + counter + " & exit 1)"}
 	} else {
-		cmd = []string{"sh", "-c", "echo x >> " + counter}
+		cmd = []string{"sh", "-c", "if [ -f " + counter + " ]; then exit 0; else : > " + counter + "; exit 1; fi"}
 	}
 
 	result, err := Run(Options{
